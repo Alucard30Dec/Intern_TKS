@@ -205,6 +205,33 @@ Required reuse checklist:
 5. For startup schema readiness, preserve existing initialization flow in `Program.cs`.
 6. For auth errors (`28P01`), surface clear actionable messages and keep stack trace.
 
+## Naming Alignment With Internship Spec (Mandatory)
+
+When the task references `Bai Tap Thuc Tap.docx`, treat document naming as source of truth for both DB schema and code property names.
+
+1. Keep table names exactly as documented (case and underscore sensitive).
+2. Keep column names exactly as documented.
+3. Keep C# model/view-model property names aligned with documented field names (use the same underscore naming if the spec uses underscore naming).
+4. Do not silently normalize names to camelCase/PascalCase variants that differ from the spec fields.
+5. Ensure `OnModelCreating` maps are exact and explicit even when property names already match DB fields.
+6. If renaming from old style to spec style:
+   - update all references in `Domain`, `Models`, `Services`, and `Components`
+   - add migration to align model snapshot
+   - run `dotnet ef database update` and verify resulting schema names
+7. For Bai 1 + Bai 2 in this repo, enforce these canonical names:
+   - table `tbl_DM_Don_Vi_Tinh`: `Don_Vi_Tinh_ID`, `Ten_Don_Vi_Tinh`, `Ghi_Chu`
+   - table `tbl_DM_Loai_San_Pham`: `Loai_San_Pham_ID`, `Ma_LSP`, `Ten_LSP`, `Ghi_Chu`
+
+## Delete Hygiene (Mandatory)
+
+When removing a UI button/feature/flow, always remove related leftovers in the same change set.
+
+1. Remove UI trigger and related hover/title text (for example `title="...sửa..."`).
+2. Remove related event wiring (for example row `@onclick` that still opens removed flow).
+3. Remove or refactor unused handlers/methods/variables/messages after deletion.
+4. Remove dead CSS selectors/classes tied only to removed elements.
+5. Re-check page behavior to ensure no hidden path still references the removed action.
+
 ## Definition Of Done
 
 Treat a task complete only when all checks pass:

@@ -7,12 +7,12 @@ namespace BlazorApp1.Models.DonViTinh;
 /// </summary>
 public sealed class DonViTinhUpsertVm
 {
-    public int Id { get; set; }
+    public int Don_Vi_Tinh_ID { get; set; }
 
     [Required(ErrorMessage = "Tên đơn vị tính không được để trống.")]
     [StringLength(100, ErrorMessage = "Tên đơn vị tính tối đa 100 ký tự.")]
-    public string TenDonViTinh { get; set; } = string.Empty;
+    public string Ten_Don_Vi_Tinh { get; set; } = string.Empty;
 
     [StringLength(255, ErrorMessage = "Ghi chú tối đa 255 ký tự.")]
-    public string? GhiChu { get; set; }
+    public string? Ghi_Chu { get; set; }
 }

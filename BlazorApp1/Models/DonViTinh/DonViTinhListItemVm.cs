@@ -5,7 +5,7 @@ namespace BlazorApp1.Models.DonViTinh;
 /// </summary>
 public sealed class DonViTinhListItemVm
 {
-    public int Id { get; set; }
-    public string TenDonViTinh { get; set; } = string.Empty;
-    public string? GhiChu { get; set; }
+    public int Don_Vi_Tinh_ID { get; set; }
+    public string Ten_Don_Vi_Tinh { get; set; } = string.Empty;
+    public string? Ghi_Chu { get; set; }
 }

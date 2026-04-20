@@ -2,6 +2,7 @@
 using BlazorApp1.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -10,9 +11,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BlazorApp1.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260420071328_CleanupLegacyConstraintNames")]
+    partial class CleanupLegacyConstraintNames
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -23,27 +26,27 @@ namespace BlazorApp1.Infrastructure.Data.Migrations
 
             modelBuilder.Entity("BlazorApp1.Domain.Entities.DonViTinh", b =>
                 {
-                    b.Property<int>("Don_Vi_Tinh_ID")
+                    b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
                         .HasColumnName("Don_Vi_Tinh_ID");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Don_Vi_Tinh_ID"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("Ghi_Chu")
+                    b.Property<string>("GhiChu")
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)")
                         .HasColumnName("Ghi_Chu");
 
-                    b.Property<string>("Ten_Don_Vi_Tinh")
+                    b.Property<string>("TenDonViTinh")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
                         .HasColumnName("Ten_Don_Vi_Tinh");
 
-                    b.HasKey("Don_Vi_Tinh_ID");
+                    b.HasKey("Id");
 
-                    b.HasIndex("Ten_Don_Vi_Tinh")
+                    b.HasIndex("TenDonViTinh")
                         .IsUnique()
                         .HasDatabaseName("UQ_tbl_DM_Don_Vi_Tinh_Ten_Don_Vi_Tinh");
 
@@ -52,37 +55,37 @@ namespace BlazorApp1.Infrastructure.Data.Migrations
 
             modelBuilder.Entity("BlazorApp1.Domain.Entities.LoaiSanPham", b =>
                 {
-                    b.Property<int>("Loai_San_Pham_ID")
+                    b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
                         .HasColumnName("Loai_San_Pham_ID");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Loai_San_Pham_ID"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("Ghi_Chu")
+                    b.Property<string>("GhiChu")
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)")
                         .HasColumnName("Ghi_Chu");
 
-                    b.Property<string>("Ma_LSP")
+                    b.Property<string>("MaLsp")
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
                         .HasColumnName("Ma_LSP");
 
-                    b.Property<string>("Ten_LSP")
+                    b.Property<string>("TenLsp")
                         .IsRequired()
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)")
                         .HasColumnName("Ten_LSP");
 
-                    b.HasKey("Loai_San_Pham_ID");
+                    b.HasKey("Id");
 
-                    b.HasIndex("Ma_LSP")
+                    b.HasIndex("MaLsp")
                         .IsUnique()
                         .HasDatabaseName("UQ_tbl_DM_Loai_San_Pham_Ma_LSP");
 
-                    b.HasIndex("Ten_LSP")
+                    b.HasIndex("TenLsp")
                         .IsUnique()
                         .HasDatabaseName("UQ_tbl_DM_Loai_San_Pham_Ten_LSP");
 

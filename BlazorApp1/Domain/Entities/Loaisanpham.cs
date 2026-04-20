@@ -7,17 +7,16 @@ namespace BlazorApp1.Domain.Entities;
 /// </summary>
 public sealed class LoaiSanPham
 {
-    public int Id { get; set; }
+    public int Loai_San_Pham_ID { get; set; }
 
     [Required]
     [MaxLength(50)]
-    public string MaLsp { get; set; } = string.Empty;
+    public string Ma_LSP { get; set; } = string.Empty;
 
     [Required]
     [MaxLength(120)]
-    public string TenLsp { get; set; } = string.Empty;
+    public string Ten_LSP { get; set; } = string.Empty;
 
     [MaxLength(255)]
-    public string? GhiChu { get; set; }
+    public string? Ghi_Chu { get; set; }
 }
-

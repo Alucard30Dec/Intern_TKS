@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 namespace BlazorApp1.Infrastructure.Data;
 
 /// <summary>
-/// DbContext quan ly schema va truy cap du lieu cho bai 1.
+/// DbContext quan ly schema va truy cap du lieu cho bai 1 va bai 2.
 /// </summary>
 public sealed class AppDbContext : DbContext
 {
@@ -34,53 +34,56 @@ public sealed class AppDbContext : DbContext
 
         modelBuilder.Entity<DonViTinh>(entity =>
         {
-            entity.ToTable("tbl_dm_don_vi_tinh");
+            entity.ToTable("tbl_DM_Don_Vi_Tinh");
 
-            entity.HasKey(x => x.Id);
+            entity.HasKey(x => x.Don_Vi_Tinh_ID);
 
-            entity.Property(x => x.Id)
-                .HasColumnName("don_vi_tinh_id");
+            entity.Property(x => x.Don_Vi_Tinh_ID)
+                .HasColumnName("Don_Vi_Tinh_ID");
 
-            entity.Property(x => x.TenDonViTinh)
-                .HasColumnName("ten_don_vi_tinh")
+            entity.Property(x => x.Ten_Don_Vi_Tinh)
+                .HasColumnName("Ten_Don_Vi_Tinh")
                 .HasMaxLength(100)
                 .IsRequired();
 
-            entity.Property(x => x.GhiChu)
-                .HasColumnName("ghi_chu")
+            entity.Property(x => x.Ghi_Chu)
+                .HasColumnName("Ghi_Chu")
                 .HasMaxLength(255);
 
-            entity.HasIndex(x => x.TenDonViTinh)
+            entity.HasIndex(x => x.Ten_Don_Vi_Tinh)
+                .HasDatabaseName("UQ_tbl_DM_Don_Vi_Tinh_Ten_Don_Vi_Tinh")
                 .IsUnique();
         });
 
         modelBuilder.Entity<LoaiSanPham>(entity =>
         {
-            entity.ToTable("tbl_dm_loai_san_pham");
+            entity.ToTable("tbl_DM_Loai_San_Pham");
 
-            entity.HasKey(x => x.Id);
+            entity.HasKey(x => x.Loai_San_Pham_ID);
 
-            entity.Property(x => x.Id)
-                .HasColumnName("loai_san_pham_id");
+            entity.Property(x => x.Loai_San_Pham_ID)
+                .HasColumnName("Loai_San_Pham_ID");
 
-            entity.Property(x => x.MaLsp)
-                .HasColumnName("ma_lsp")
+            entity.Property(x => x.Ma_LSP)
+                .HasColumnName("Ma_LSP")
                 .HasMaxLength(50)
                 .IsRequired();
 
-            entity.Property(x => x.TenLsp)
-                .HasColumnName("ten_lsp")
+            entity.Property(x => x.Ten_LSP)
+                .HasColumnName("Ten_LSP")
                 .HasMaxLength(120)
                 .IsRequired();
 
-            entity.Property(x => x.GhiChu)
-                .HasColumnName("ghi_chu")
+            entity.Property(x => x.Ghi_Chu)
+                .HasColumnName("Ghi_Chu")
                 .HasMaxLength(255);
 
-            entity.HasIndex(x => x.MaLsp)
+            entity.HasIndex(x => x.Ma_LSP)
+                .HasDatabaseName("UQ_tbl_DM_Loai_San_Pham_Ma_LSP")
                 .IsUnique();
 
-            entity.HasIndex(x => x.TenLsp)
+            entity.HasIndex(x => x.Ten_LSP)
+                .HasDatabaseName("UQ_tbl_DM_Loai_San_Pham_Ten_LSP")
                 .IsUnique();
         });
     }

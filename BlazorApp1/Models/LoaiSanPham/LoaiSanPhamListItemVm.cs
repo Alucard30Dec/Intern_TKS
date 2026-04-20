@@ -5,9 +5,8 @@ namespace BlazorApp1.Models.LoaiSanPham;
 /// </summary>
 public sealed class LoaiSanPhamListItemVm
 {
-    public int Id { get; set; }
-    public string MaLsp { get; set; } = string.Empty;
-    public string TenLsp { get; set; } = string.Empty;
-    public string? GhiChu { get; set; }
+    public int Loai_San_Pham_ID { get; set; }
+    public string Ma_LSP { get; set; } = string.Empty;
+    public string Ten_LSP { get; set; } = string.Empty;
+    public string? Ghi_Chu { get; set; }
 }
-

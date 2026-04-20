@@ -32,12 +32,12 @@ public sealed class DonViTinhService : IDonViTinhService
 
         return await dbContext.DonViTinhs
             .AsNoTracking()
-            .OrderBy(x => x.TenDonViTinh)
+            .OrderBy(x => x.Ten_Don_Vi_Tinh)
             .Select(x => new DonViTinhListItemVm
             {
-                Id = x.Id,
-                TenDonViTinh = x.TenDonViTinh,
-                GhiChu = x.GhiChu
+                Don_Vi_Tinh_ID = x.Don_Vi_Tinh_ID,
+                Ten_Don_Vi_Tinh = x.Ten_Don_Vi_Tinh,
+                Ghi_Chu = x.Ghi_Chu
             })
             .ToListAsync(cancellationToken);
     }
@@ -58,7 +58,7 @@ public sealed class DonViTinhService : IDonViTinhService
 
             var entity = await dbContext.DonViTinhs
                 .AsNoTracking()
-                .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+                .FirstOrDefaultAsync(x => x.Don_Vi_Tinh_ID == id, cancellationToken);
 
             if (entity is null)
             {
@@ -67,14 +67,14 @@ public sealed class DonViTinhService : IDonViTinhService
 
             return ServiceResult<DonViTinhUpsertVm>.Ok(new DonViTinhUpsertVm
             {
-                Id = entity.Id,
-                TenDonViTinh = entity.TenDonViTinh,
-                GhiChu = entity.GhiChu
+                Don_Vi_Tinh_ID = entity.Don_Vi_Tinh_ID,
+                Ten_Don_Vi_Tinh = entity.Ten_Don_Vi_Tinh,
+                Ghi_Chu = entity.Ghi_Chu
             });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Get DonViTinh by id failed. Id={Id}", id);
+            _logger.LogError(ex, "Get DonViTinh by id failed. Don_Vi_Tinh_ID={Don_Vi_Tinh_ID}", id);
             return ServiceResult<DonViTinhUpsertVm>.Fail("Không thể tải thông tin đơn vị tính.");
         }
     }
@@ -90,7 +90,7 @@ public sealed class DonViTinhService : IDonViTinhService
             return validation;
         }
 
-        var normalizedName = NormalizeName(model.TenDonViTinh);
+        var normalizedName = NormalizeName(model.Ten_Don_Vi_Tinh);
 
         try
         {
@@ -104,9 +104,9 @@ public sealed class DonViTinhService : IDonViTinhService
 
             var entity = new DonViTinh
             {
-                TenDonViTinh = normalizedName,
+                Ten_Don_Vi_Tinh = normalizedName,
                 // Luu null thay vi chuoi rong de tranh sai lech khi loc/bao cao du lieu "co ghi chu".
-                GhiChu = NormalizeNullableText(model.GhiChu)
+                Ghi_Chu = NormalizeNullableText(model.Ghi_Chu)
             };
 
             dbContext.DonViTinhs.Add(entity);
@@ -115,12 +115,12 @@ public sealed class DonViTinhService : IDonViTinhService
         }
         catch (DbUpdateException ex)
         {
-            _logger.LogError(ex, "Create DonViTinh failed. Name={TenDonViTinh}", normalizedName);
+            _logger.LogError(ex, "Create DonViTinh failed. Name={Ten_Don_Vi_Tinh}", normalizedName);
             return ServiceResult.Fail("Không thể thêm đơn vị tính. Có thể dữ liệu đã bị trùng.");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error while creating DonViTinh. Name={TenDonViTinh}", normalizedName);
+            _logger.LogError(ex, "Unexpected error while creating DonViTinh. Name={Ten_Don_Vi_Tinh}", normalizedName);
             return ServiceResult.Fail("Không thể thêm đơn vị tính do lỗi hệ thống.");
         }
     }
@@ -130,7 +130,7 @@ public sealed class DonViTinhService : IDonViTinhService
     /// </summary>
     public async Task<ServiceResult> UpdateAsync(DonViTinhUpsertVm model, CancellationToken cancellationToken = default)
     {
-        if (model.Id <= 0)
+        if (model.Don_Vi_Tinh_ID <= 0)
         {
             return ServiceResult.Fail("ID không hợp lệ.");
         }
@@ -141,41 +141,41 @@ public sealed class DonViTinhService : IDonViTinhService
             return validation;
         }
 
-        var normalizedName = NormalizeName(model.TenDonViTinh);
+        var normalizedName = NormalizeName(model.Ten_Don_Vi_Tinh);
 
         try
         {
             await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
             var entity = await dbContext.DonViTinhs
-                .FirstOrDefaultAsync(x => x.Id == model.Id, cancellationToken);
+                .FirstOrDefaultAsync(x => x.Don_Vi_Tinh_ID == model.Don_Vi_Tinh_ID, cancellationToken);
 
             if (entity is null)
             {
                 return ServiceResult.Fail("Không tìm thấy đơn vị tính để cập nhật.");
             }
 
-            var duplicated = await ExistsByNameAsync(dbContext, normalizedName, model.Id, cancellationToken);
+            var duplicated = await ExistsByNameAsync(dbContext, normalizedName, model.Don_Vi_Tinh_ID, cancellationToken);
             if (duplicated)
             {
                 return ServiceResult.Fail("Tên đơn vị tính đã tồn tại.");
             }
 
-            entity.TenDonViTinh = normalizedName;
+            entity.Ten_Don_Vi_Tinh = normalizedName;
             // Giu quy uoc luu null dong nhat voi tao moi va voi data cu.
-            entity.GhiChu = NormalizeNullableText(model.GhiChu);
+            entity.Ghi_Chu = NormalizeNullableText(model.Ghi_Chu);
 
             await dbContext.SaveChangesAsync(cancellationToken);
             return ServiceResult.Ok("Cập nhật đơn vị tính thành công.");
         }
         catch (DbUpdateException ex)
         {
-            _logger.LogError(ex, "Update DonViTinh failed. Id={Id}", model.Id);
+            _logger.LogError(ex, "Update DonViTinh failed. Don_Vi_Tinh_ID={Don_Vi_Tinh_ID}", model.Don_Vi_Tinh_ID);
             return ServiceResult.Fail("Không thể cập nhật đơn vị tính. Có thể dữ liệu đã bị trùng.");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error while updating DonViTinh. Id={Id}", model.Id);
+            _logger.LogError(ex, "Unexpected error while updating DonViTinh. Don_Vi_Tinh_ID={Don_Vi_Tinh_ID}", model.Don_Vi_Tinh_ID);
             return ServiceResult.Fail("Không thể cập nhật đơn vị tính do lỗi hệ thống.");
         }
     }
@@ -195,7 +195,7 @@ public sealed class DonViTinhService : IDonViTinhService
             await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
             var entity = await dbContext.DonViTinhs
-                .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+                .FirstOrDefaultAsync(x => x.Don_Vi_Tinh_ID == id, cancellationToken);
 
             if (entity is null)
             {
@@ -208,12 +208,12 @@ public sealed class DonViTinhService : IDonViTinhService
         }
         catch (DbUpdateException ex)
         {
-            _logger.LogError(ex, "Delete DonViTinh failed. Id={Id}", id);
+            _logger.LogError(ex, "Delete DonViTinh failed. Don_Vi_Tinh_ID={Don_Vi_Tinh_ID}", id);
             return ServiceResult.Fail("Không thể xóa đơn vị tính. Dữ liệu có thể đang được sử dụng ở màn hình khác.");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error while deleting DonViTinh. Id={Id}", id);
+            _logger.LogError(ex, "Unexpected error while deleting DonViTinh. Don_Vi_Tinh_ID={Don_Vi_Tinh_ID}", id);
             return ServiceResult.Fail("Không thể xóa đơn vị tính do lỗi hệ thống.");
         }
     }
@@ -225,7 +225,7 @@ public sealed class DonViTinhService : IDonViTinhService
             return ServiceResult.Fail("Dữ liệu không hợp lệ.");
         }
 
-        var normalizedName = NormalizeName(model.TenDonViTinh);
+        var normalizedName = NormalizeName(model.Ten_Don_Vi_Tinh);
 
         if (string.IsNullOrWhiteSpace(normalizedName))
         {
@@ -237,7 +237,7 @@ public sealed class DonViTinhService : IDonViTinhService
             return ServiceResult.Fail("Tên đơn vị tính tối đa 100 ký tự.");
         }
 
-        var ghiChu = NormalizeNullableText(model.GhiChu);
+        var ghiChu = NormalizeNullableText(model.Ghi_Chu);
         if (ghiChu is not null && ghiChu.Length > 255)
         {
             return ServiceResult.Fail("Ghi chú tối đa 255 ký tự.");
@@ -256,8 +256,8 @@ public sealed class DonViTinhService : IDonViTinhService
         var compareValue = normalizedName.ToUpper();
 
         return await dbContext.DonViTinhs.AnyAsync(
-            x => (!ignoreId.HasValue || x.Id != ignoreId.Value)
-                 && x.TenDonViTinh.ToUpper() == compareValue,
+            x => (!ignoreId.HasValue || x.Don_Vi_Tinh_ID != ignoreId.Value)
+                 && x.Ten_Don_Vi_Tinh.ToUpper() == compareValue,
             cancellationToken);
     }
 
@@ -285,3 +285,6 @@ public sealed class DonViTinhService : IDonViTinhService
         return value.Trim();
     }
 }
+
+
+

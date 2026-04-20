@@ -7,12 +7,12 @@ namespace BlazorApp1.Domain.Entities;
 /// </summary>
 public sealed class DonViTinh
 {
-    public int Id { get; set; }
+    public int Don_Vi_Tinh_ID { get; set; }
 
     [Required]
     [MaxLength(100)]
-    public string TenDonViTinh { get; set; } = string.Empty;
+    public string Ten_Don_Vi_Tinh { get; set; } = string.Empty;
 
     [MaxLength(255)]
-    public string? GhiChu { get; set; }
+    public string? Ghi_Chu { get; set; }
 }
