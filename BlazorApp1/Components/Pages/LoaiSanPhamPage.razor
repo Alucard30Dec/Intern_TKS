@@ -1,0 +1,376 @@
+@page "/danh-muc/loai-san-pham"
+@rendermode InteractiveServer
+@using BlazorApp1.Models.LoaiSanPham
+@using BlazorApp1.Services.Interfaces
+@inject ILoaiSanPhamService LoaiSanPhamService
+@inject IJSRuntime JS
+@inject ILogger<LoaiSanPhamPage> Logger
+
+<PageTitle>Loại sản phẩm</PageTitle>
+
+<section class="category-page">
+    @{
+        var filteredItems = FilteredItems;
+    }
+
+    <header class="page-header">
+        <h1>Loại sản phẩm</h1>
+        <button type="button" class="app-button app-button--primary" @onclick="StartCreate" disabled="@isSaving">
+            Thêm mới
+        </button>
+    </header>
+
+    @if (!string.IsNullOrWhiteSpace(pageMessage))
+    {
+        <div class="status-banner @(pageMessageIsError ? "status-banner--error" : "status-banner--success")" role="alert">
+            @pageMessage
+        </div>
+    }
+
+    <div class="category-layout">
+        <section class="card card--list">
+            <header class="card__header card__header--toolbar">
+                <h2>Danh sách</h2>
+                <div class="toolbar">
+                    <label class="search-field">
+                        <span class="search-field__label">Tìm kiếm</span>
+                        <InputText class="search-field__input"
+                                   @bind-Value="searchKeyword"
+                                   @bind-Value:event="oninput"
+                                   placeholder="Tìm theo mã, tên, ghi chú" />
+                    </label>
+                    @if (!string.IsNullOrWhiteSpace(searchKeyword))
+                    {
+                        <button type="button" class="app-button app-button--ghost" @onclick="ClearSearch">
+                            Xóa
+                        </button>
+                    }
+                </div>
+            </header>
+
+            <div class="card__body card__body--table">
+                @if (isLoading)
+                {
+                    <div class="state-box">Đang tải dữ liệu...</div>
+                }
+                else if (items.Count == 0)
+                {
+                    <div class="state-box state-box--empty">Chưa có dữ liệu.</div>
+                }
+                else if (filteredItems.Count == 0)
+                {
+                    <div class="state-box state-box--empty">Không có kết quả phù hợp.</div>
+                }
+                else
+                {
+                    <div class="table-wrap">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th class="data-table__index">STT</th>
+                                    <th class="data-table__code">Mã</th>
+                                    <th>Tên</th>
+                                    <th>Ghi chú</th>
+                                    <th class="data-table__actions">Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @for (var i = 0; i < filteredItems.Count; i++)
+                                {
+                                    var item = filteredItems[i];
+
+                                    <tr class="@(formModel.Id == item.Id ? "data-table__row data-table__row--active" : "data-table__row")"
+                                        title="Bấm để chỉnh sửa bản ghi"
+                                        @onclick="() => StartEditAsync(item.Id)">
+                                        <td>@(i + 1)</td>
+                                        <td class="data-table__code-value">@item.MaLsp</td>
+                                        <td class="data-table__name">@item.TenLsp</td>
+                                        <td>
+                                            @if (string.IsNullOrWhiteSpace(item.GhiChu))
+                                            {
+                                                <span class="data-table__muted">Trống</span>
+                                            }
+                                            else
+                                            {
+                                                @item.GhiChu
+                                            }
+                                        </td>
+                                        <td>
+                                            <div class="action-group">
+                                                <button class="app-button app-button--warning"
+                                                        @onclick="() => StartEditAsync(item.Id)"
+                                                        @onclick:stopPropagation="true"
+                                                        disabled="@isSaving">
+                                                    Sửa
+                                                </button>
+                                                <button class="app-button app-button--danger"
+                                                        @onclick="() => DeleteAsync(item.Id, item.TenLsp)"
+                                                        @onclick:stopPropagation="true"
+                                                        disabled="@isSaving">
+                                                    Xóa
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </section>
+
+        <section class="card card--form">
+            <header class="card__header card__header--form">
+                <h2>Thêm / Sửa loại sản phẩm</h2>
+                @if (IsEditing)
+                {
+                    <span class="card__tag">Đang sửa</span>
+                }
+            </header>
+
+            <div class="card__body">
+                <EditForm Model="formModel" OnValidSubmit="SaveAsync" FormName="LoaiSanPhamForm">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+
+                    @if (!string.IsNullOrWhiteSpace(formMessage))
+                    {
+                        <div class="status-banner @(formMessageIsError ? "status-banner--error" : "status-banner--success")" role="alert">
+                            @formMessage
+                        </div>
+                    }
+
+                    <div class="form-field">
+                        <label class="form-field__label">Mã <span class="required-mark">*</span></label>
+                        <InputText class="form-field__input"
+                                   @bind-Value="formModel.MaLsp"
+                                   maxlength="50"
+                                   placeholder="Nhập mã" />
+                        <ValidationMessage For="@(() => formModel.MaLsp)" />
+                    </div>
+
+                    <div class="form-field">
+                        <label class="form-field__label">Tên <span class="required-mark">*</span></label>
+                        <InputText class="form-field__input"
+                                   @bind-Value="formModel.TenLsp"
+                                   maxlength="120"
+                                   placeholder="Nhập tên" />
+                        <ValidationMessage For="@(() => formModel.TenLsp)" />
+                    </div>
+
+                    <div class="form-field">
+                        <label class="form-field__label">Ghi chú</label>
+                        <InputTextArea class="form-field__input form-field__input--multiline"
+                                       @bind-Value="formModel.GhiChu"
+                                       maxlength="255"
+                                       placeholder="Nhập ghi chú" />
+                        <ValidationMessage For="@(() => formModel.GhiChu)" />
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="app-button app-button--success" disabled="@isSaving">
+                            @(isSaving ? "Đang lưu..." : "Lưu")
+                        </button>
+                        <button type="button" class="app-button app-button--secondary" @onclick="ResetForm" disabled="@isSaving">
+                            Đặt lại
+                        </button>
+                    </div>
+                </EditForm>
+            </div>
+        </section>
+    </div>
+</section>
+
+@code {
+    private readonly List<LoaiSanPhamListItemVm> items = [];
+    private LoaiSanPhamUpsertVm formModel = new();
+    private bool isLoading = true;
+    private bool isSaving;
+    private string? pageMessage;
+    private bool pageMessageIsError;
+    private string? formMessage;
+    private bool formMessageIsError;
+    private string searchKeyword = string.Empty;
+
+    private bool IsEditing => formModel.Id > 0;
+
+    private IReadOnlyList<LoaiSanPhamListItemVm> FilteredItems
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(searchKeyword))
+            {
+                return items;
+            }
+
+            var keyword = searchKeyword.Trim();
+
+            // Loc tren bo nho de cap nhat UI tuc thi theo oninput, khong tao round-trip DB cho moi ky tu.
+            return items
+                .Where(x =>
+                    ContainsKeyword(x.MaLsp, keyword)
+                    || ContainsKeyword(x.TenLsp, keyword)
+                    || ContainsKeyword(x.GhiChu, keyword))
+                .ToList();
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        try
+        {
+            isLoading = true;
+            ClearPageMessage();
+            ClearFormMessage();
+
+            items.Clear();
+            items.AddRange(await LoaiSanPhamService.GetAllAsync());
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Load LoaiSanPham list failed.");
+            pageMessage = "Không thể tải danh mục loại sản phẩm.";
+            pageMessageIsError = true;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void StartCreate()
+    {
+        ResetForm();
+        ClearPageMessage();
+    }
+
+    private async Task StartEditAsync(int id)
+    {
+        ClearPageMessage();
+        ClearFormMessage();
+
+        // Luon tai lai tu DB de tranh sua tren du lieu cu khi danh sach da bi thay doi boi nguoi dung khac.
+        var result = await LoaiSanPhamService.GetByIdAsync(id);
+
+        if (!result.Success || result.Data is null)
+        {
+            pageMessage = result.Message;
+            pageMessageIsError = true;
+            return;
+        }
+
+        formModel = new LoaiSanPhamUpsertVm
+        {
+            Id = result.Data.Id,
+            MaLsp = result.Data.MaLsp,
+            TenLsp = result.Data.TenLsp,
+            GhiChu = result.Data.GhiChu
+        };
+    }
+
+    private async Task SaveAsync()
+    {
+        isSaving = true;
+        ClearFormMessage();
+        ClearPageMessage();
+
+        try
+        {
+            var result = formModel.Id == 0
+                ? await LoaiSanPhamService.CreateAsync(formModel)
+                : await LoaiSanPhamService.UpdateAsync(formModel);
+
+            formMessage = result.Message;
+            formMessageIsError = !result.Success;
+
+            if (!result.Success)
+            {
+                return;
+            }
+
+            await LoadDataAsync();
+            ResetForm();
+            pageMessage = result.Message;
+            pageMessageIsError = false;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Save LoaiSanPham failed. Id={Id}", formModel.Id);
+            formMessage = "Không thể lưu dữ liệu do lỗi hệ thống.";
+            formMessageIsError = true;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task DeleteAsync(int id, string tenLsp)
+    {
+        ClearPageMessage();
+        ClearFormMessage();
+
+        var confirmed = await JS.InvokeAsync<bool>(
+            "confirm",
+            $"Bạn có chắc muốn xóa loại sản phẩm '{tenLsp}' không?");
+
+        if (!confirmed)
+        {
+            return;
+        }
+
+        var result = await LoaiSanPhamService.DeleteAsync(id);
+
+        pageMessage = result.Message;
+        pageMessageIsError = !result.Success;
+
+        if (!result.Success)
+        {
+            return;
+        }
+
+        if (formModel.Id == id)
+        {
+            ResetForm();
+        }
+
+        await LoadDataAsync();
+        pageMessage = result.Message;
+        pageMessageIsError = false;
+    }
+
+    private void ResetForm()
+    {
+        formModel = new LoaiSanPhamUpsertVm();
+        ClearFormMessage();
+    }
+
+    private void ClearSearch()
+    {
+        searchKeyword = string.Empty;
+    }
+
+    private void ClearPageMessage()
+    {
+        pageMessage = null;
+        pageMessageIsError = false;
+    }
+
+    private void ClearFormMessage()
+    {
+        formMessage = null;
+        formMessageIsError = false;
+    }
+
+    private static bool ContainsKeyword(string? source, string keyword)
+    {
+        return !string.IsNullOrWhiteSpace(source)
+               && source.Contains(keyword, StringComparison.OrdinalIgnoreCase);
+    }
+}

@@ -1,0 +1,340 @@
+using BlazorApp1.Domain.Entities;
+using BlazorApp1.Infrastructure.Data;
+using BlazorApp1.Models.Common;
+using BlazorApp1.Models.LoaiSanPham;
+using BlazorApp1.Services.Interfaces;
+using Microsoft.EntityFrameworkCore;
+
+namespace BlazorApp1.Services;
+
+/// <summary>
+/// Xu ly nghiep vu bai 2: them, sua, xoa danh muc loai san pham.
+/// </summary>
+public sealed class LoaiSanPhamService : ILoaiSanPhamService
+{
+    private readonly IDbContextFactory<AppDbContext> _dbContextFactory;
+    private readonly ILogger<LoaiSanPhamService> _logger;
+
+    public LoaiSanPhamService(
+        IDbContextFactory<AppDbContext> dbContextFactory,
+        ILogger<LoaiSanPhamService> logger)
+    {
+        _dbContextFactory = dbContextFactory;
+        _logger = logger;
+    }
+
+    /// <summary>
+    /// Lay danh sach loai san pham cho man hinh danh muc.
+    /// </summary>
+    public async Task<IReadOnlyList<LoaiSanPhamListItemVm>> GetAllAsync(CancellationToken cancellationToken = default)
+    {
+        await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        return await dbContext.LoaiSanPhams
+            .AsNoTracking()
+            .OrderBy(x => x.MaLsp)
+            .ThenBy(x => x.TenLsp)
+            .Select(x => new LoaiSanPhamListItemVm
+            {
+                Id = x.Id,
+                MaLsp = x.MaLsp,
+                TenLsp = x.TenLsp,
+                GhiChu = x.GhiChu
+            })
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Lay chi tiet loai san pham theo ID de nap vao form sua.
+    /// </summary>
+    public async Task<ServiceResult<LoaiSanPhamUpsertVm>> GetByIdAsync(int id, CancellationToken cancellationToken = default)
+    {
+        if (id <= 0)
+        {
+            return ServiceResult<LoaiSanPhamUpsertVm>.Fail("ID không hợp lệ.");
+        }
+
+        try
+        {
+            await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+            var entity = await dbContext.LoaiSanPhams
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+            if (entity is null)
+            {
+                return ServiceResult<LoaiSanPhamUpsertVm>.Fail("Không tìm thấy loại sản phẩm.");
+            }
+
+            return ServiceResult<LoaiSanPhamUpsertVm>.Ok(new LoaiSanPhamUpsertVm
+            {
+                Id = entity.Id,
+                MaLsp = entity.MaLsp,
+                TenLsp = entity.TenLsp,
+                GhiChu = entity.GhiChu
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Get LoaiSanPham by id failed. Id={Id}", id);
+            return ServiceResult<LoaiSanPhamUpsertVm>.Fail("Không thể tải thông tin loại sản phẩm.");
+        }
+    }
+
+    /// <summary>
+    /// Tao moi loai san pham va tra ve ket qua nghiep vu.
+    /// </summary>
+    public async Task<ServiceResult> CreateAsync(LoaiSanPhamUpsertVm model, CancellationToken cancellationToken = default)
+    {
+        var validation = ValidateBusinessRules(model);
+        if (!validation.Success)
+        {
+            return validation;
+        }
+
+        var normalizedCode = NormalizeCode(model.MaLsp);
+        var normalizedName = NormalizeName(model.TenLsp);
+
+        try
+        {
+            await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+            var duplicatedCode = await ExistsByCodeAsync(dbContext, normalizedCode, null, cancellationToken);
+            if (duplicatedCode)
+            {
+                return ServiceResult.Fail("Mã đã tồn tại.");
+            }
+
+            var duplicatedName = await ExistsByNameAsync(dbContext, normalizedName, null, cancellationToken);
+            if (duplicatedName)
+            {
+                return ServiceResult.Fail("Tên đã tồn tại.");
+            }
+
+            var entity = new LoaiSanPham
+            {
+                MaLsp = normalizedCode,
+                TenLsp = normalizedName,
+                // Luu null thay vi chuoi rong de tranh sai lech khi thong ke ban ghi "co ghi chu".
+                GhiChu = NormalizeNullableText(model.GhiChu)
+            };
+
+            dbContext.LoaiSanPhams.Add(entity);
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return ServiceResult.Ok("Thêm loại sản phẩm thành công.");
+        }
+        catch (DbUpdateException ex)
+        {
+            _logger.LogError(ex, "Create LoaiSanPham failed. Ma={MaLsp}", normalizedCode);
+            return ServiceResult.Fail("Không thể thêm loại sản phẩm. Có thể dữ liệu đã bị trùng.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error while creating LoaiSanPham. Ma={MaLsp}", normalizedCode);
+            return ServiceResult.Fail("Không thể thêm loại sản phẩm do lỗi hệ thống.");
+        }
+    }
+
+    /// <summary>
+    /// Cap nhat loai san pham theo ID.
+    /// </summary>
+    public async Task<ServiceResult> UpdateAsync(LoaiSanPhamUpsertVm model, CancellationToken cancellationToken = default)
+    {
+        if (model.Id <= 0)
+        {
+            return ServiceResult.Fail("ID không hợp lệ.");
+        }
+
+        var validation = ValidateBusinessRules(model);
+        if (!validation.Success)
+        {
+            return validation;
+        }
+
+        var normalizedCode = NormalizeCode(model.MaLsp);
+        var normalizedName = NormalizeName(model.TenLsp);
+
+        try
+        {
+            await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+            var entity = await dbContext.LoaiSanPhams
+                .FirstOrDefaultAsync(x => x.Id == model.Id, cancellationToken);
+
+            if (entity is null)
+            {
+                return ServiceResult.Fail("Không tìm thấy loại sản phẩm để cập nhật.");
+            }
+
+            var duplicatedCode = await ExistsByCodeAsync(dbContext, normalizedCode, model.Id, cancellationToken);
+            if (duplicatedCode)
+            {
+                return ServiceResult.Fail("Mã đã tồn tại.");
+            }
+
+            var duplicatedName = await ExistsByNameAsync(dbContext, normalizedName, model.Id, cancellationToken);
+            if (duplicatedName)
+            {
+                return ServiceResult.Fail("Tên đã tồn tại.");
+            }
+
+            entity.MaLsp = normalizedCode;
+            entity.TenLsp = normalizedName;
+            // Giu quy uoc luu null dong nhat voi tao moi va voi data cu.
+            entity.GhiChu = NormalizeNullableText(model.GhiChu);
+
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return ServiceResult.Ok("Cập nhật loại sản phẩm thành công.");
+        }
+        catch (DbUpdateException ex)
+        {
+            _logger.LogError(ex, "Update LoaiSanPham failed. Id={Id}", model.Id);
+            return ServiceResult.Fail("Không thể cập nhật loại sản phẩm. Có thể dữ liệu đã bị trùng.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error while updating LoaiSanPham. Id={Id}", model.Id);
+            return ServiceResult.Fail("Không thể cập nhật loại sản phẩm do lỗi hệ thống.");
+        }
+    }
+
+    /// <summary>
+    /// Xoa loai san pham theo ID.
+    /// </summary>
+    public async Task<ServiceResult> DeleteAsync(int id, CancellationToken cancellationToken = default)
+    {
+        if (id <= 0)
+        {
+            return ServiceResult.Fail("ID không hợp lệ.");
+        }
+
+        try
+        {
+            await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+            var entity = await dbContext.LoaiSanPhams
+                .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+            if (entity is null)
+            {
+                return ServiceResult.Fail("Không tìm thấy loại sản phẩm để xóa.");
+            }
+
+            dbContext.LoaiSanPhams.Remove(entity);
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return ServiceResult.Ok("Xóa loại sản phẩm thành công.");
+        }
+        catch (DbUpdateException ex)
+        {
+            _logger.LogError(ex, "Delete LoaiSanPham failed. Id={Id}", id);
+            return ServiceResult.Fail("Không thể xóa loại sản phẩm. Dữ liệu có thể đang được sử dụng ở màn hình khác.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error while deleting LoaiSanPham. Id={Id}", id);
+            return ServiceResult.Fail("Không thể xóa loại sản phẩm do lỗi hệ thống.");
+        }
+    }
+
+    private static ServiceResult ValidateBusinessRules(LoaiSanPhamUpsertVm model)
+    {
+        if (model is null)
+        {
+            return ServiceResult.Fail("Dữ liệu không hợp lệ.");
+        }
+
+        var normalizedCode = NormalizeCode(model.MaLsp);
+        if (string.IsNullOrWhiteSpace(normalizedCode))
+        {
+            return ServiceResult.Fail("Mã không được để trống.");
+        }
+
+        if (normalizedCode.Length > 50)
+        {
+            return ServiceResult.Fail("Mã tối đa 50 ký tự.");
+        }
+
+        var normalizedName = NormalizeName(model.TenLsp);
+        if (string.IsNullOrWhiteSpace(normalizedName))
+        {
+            return ServiceResult.Fail("Tên không được để trống.");
+        }
+
+        if (normalizedName.Length > 120)
+        {
+            return ServiceResult.Fail("Tên tối đa 120 ký tự.");
+        }
+
+        var ghiChu = NormalizeNullableText(model.GhiChu);
+        if (ghiChu is not null && ghiChu.Length > 255)
+        {
+            return ServiceResult.Fail("Ghi chú tối đa 255 ký tự.");
+        }
+
+        return ServiceResult.Ok();
+    }
+
+    private static async Task<bool> ExistsByCodeAsync(
+        AppDbContext dbContext,
+        string normalizedCode,
+        int? ignoreId,
+        CancellationToken cancellationToken)
+    {
+        // Quy tac nghiep vu coi ma khong phan biet hoa-thuong de tranh tao trung ma chi khac casing.
+        var compareValue = normalizedCode.ToUpper();
+
+        return await dbContext.LoaiSanPhams.AnyAsync(
+            x => (!ignoreId.HasValue || x.Id != ignoreId.Value)
+                 && x.MaLsp.ToUpper() == compareValue,
+            cancellationToken);
+    }
+
+    private static async Task<bool> ExistsByNameAsync(
+        AppDbContext dbContext,
+        string normalizedName,
+        int? ignoreId,
+        CancellationToken cancellationToken)
+    {
+        // Quy tac nghiep vu coi ten khong phan biet hoa-thuong.
+        var compareValue = normalizedName.ToUpper();
+
+        return await dbContext.LoaiSanPhams.AnyAsync(
+            x => (!ignoreId.HasValue || x.Id != ignoreId.Value)
+                 && x.TenLsp.ToUpper() == compareValue,
+            cancellationToken);
+    }
+
+    private static string NormalizeCode(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        return value.Trim().ToUpperInvariant();
+    }
+
+    private static string NormalizeName(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var parts = value
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        return string.Join(" ", parts);
+    }
+
+    private static string? NormalizeNullableText(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        return value.Trim();
+    }
+}

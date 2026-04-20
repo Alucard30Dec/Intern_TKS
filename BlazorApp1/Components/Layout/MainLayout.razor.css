@@ -1,0 +1,68 @@
+#blazor-error-ui {
+    background: #fff1f2;
+    border-top: 1px solid #fda4af;
+    bottom: 0;
+    box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.08);
+    color: #881337;
+    display: none;
+    left: 0;
+    padding: 0.85rem 1.2rem;
+    position: fixed;
+    width: 100%;
+    z-index: 1000;
+}
+
+#blazor-error-ui .dismiss {
+    cursor: pointer;
+    position: absolute;
+    right: 1rem;
+    top: 0.7rem;
+}
+
+.app-shell {
+    box-sizing: border-box;
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: minmax(260px, 300px) minmax(0, 1fr);
+    margin: 0 auto;
+    max-width: 1460px;
+    min-height: 100vh;
+    padding: 1rem;
+}
+
+.app-sidebar {
+    background: #fff;
+    border: 1px solid #dbe3ee;
+    border-radius: 14px;
+    height: fit-content;
+    padding: 1rem;
+    position: sticky;
+    top: 1rem;
+}
+
+.app-sidebar h2 {
+    color: #0f172a;
+    font-size: 1.05rem;
+    margin: 0 0 0.8rem;
+}
+
+.app-main {
+    min-width: 0;
+}
+
+@media (max-width: 980px) {
+    .app-shell {
+        grid-template-columns: 1fr;
+    }
+
+    .app-sidebar {
+        position: static;
+        top: auto;
+    }
+}
+
+@media (max-width: 640px) {
+    .app-shell {
+        padding: 0.75rem;
+    }
+}
