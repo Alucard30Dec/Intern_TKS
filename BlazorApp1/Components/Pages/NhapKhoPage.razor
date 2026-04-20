@@ -1,0 +1,1004 @@
+@page "/nhap-kho"
+@rendermode InteractiveServer
+@using System.Globalization
+@using BlazorApp1.Models.Kho
+@using BlazorApp1.Models.Common
+@using BlazorApp1.Models.NhaCungCap
+@using BlazorApp1.Models.NhapKho
+@using BlazorApp1.Models.SanPham
+@using BlazorApp1.Services.Interfaces
+@inject INhapKhoService NhapKhoService
+@inject IKhoService KhoService
+@inject INhaCungCapService NhaCungCapService
+@inject ISanPhamService SanPhamService
+@inject IJSRuntime JS
+@inject ILogger<NhapKhoPage> Logger
+
+<PageTitle>Quản lý phiếu nhập kho</PageTitle>
+
+<section class="import-page">
+    @{
+        var filteredItems = FilteredItems;
+    }
+
+    <header class="page-header">
+        <h1>Quản lý phiếu nhập kho</h1>
+        <button type="button" class="app-button app-button--primary" @onclick="StartCreate" disabled="@isSaving">
+            Thêm phiếu nhập
+        </button>
+    </header>
+
+    @if (!string.IsNullOrWhiteSpace(pageMessage))
+    {
+        <div class="status-banner @(pageMessageIsError ? "status-banner--error" : "status-banner--success")" role="alert">
+            @pageMessage
+        </div>
+    }
+
+    <div class="import-layout import-layout--single">
+        <section class="card card--list">
+            <header class="card__header card__header--toolbar">
+                <h2>Danh sách phiếu nhập (@filteredItems.Count)</h2>
+                <div class="toolbar">
+                    <label class="search-field">
+                        <span class="search-field__label">Tìm kiếm</span>
+                        <input class="search-field__input"
+                               value="@searchKeyword"
+                               @oninput="HandleSearchInput"
+                               placeholder="Số phiếu, kho, nhà cung cấp" />
+                    </label>
+                    @if (!string.IsNullOrWhiteSpace(searchKeyword))
+                    {
+                        <button type="button" class="app-button app-button--ghost" @onclick="ClearSearch">
+                            Xóa
+                        </button>
+                    }
+                </div>
+            </header>
+
+            <div class="card__body card__body--table">
+                @if (isLoading)
+                {
+                    <div class="state-box">Đang tải dữ liệu...</div>
+                }
+                else if (items.Count == 0)
+                {
+                    <div class="state-box state-box--empty">Chưa có dữ liệu.</div>
+                }
+                else if (filteredItems.Count == 0)
+                {
+                    <div class="state-box state-box--empty">Không có kết quả phù hợp.</div>
+                }
+                else
+                {
+                    <div class="table-wrap">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th class="data-table__index">STT</th>
+                                    <th>Số phiếu</th>
+                                    <th>Ngày nhập</th>
+                                    <th>Kho</th>
+                                    <th>NCC</th>
+                                    <th class="data-table__number">Số dòng</th>
+                                    <th class="data-table__number">Tổng trị giá</th>
+                                    <th>Ghi chú</th>
+                                    <th class="data-table__actions">Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @for (var i = 0; i < filteredItems.Count; i++)
+                                {
+                                    var item = filteredItems[i];
+
+                                    <tr class="@(selectedNhapKhoId == item.Nhap_Kho_ID ? "data-table__row data-table__row--active" : "data-table__row")"
+                                        title="Bấm để mở phiếu nhập và chỉnh sửa"
+                                        @onclick="() => StartEditAsync(item)">
+                                        <td>@(i + 1)</td>
+                                        <td class="data-table__code-value">@item.So_Phieu_Nhap_Kho</td>
+                                        <td>@item.Ngay_Nhap_Kho.ToString("dd/MM/yyyy")</td>
+                                        <td class="data-table__name">@item.Ten_Kho</td>
+                                        <td>@item.Ten_NCC</td>
+                                        <td class="data-table__number">@item.So_Dong_Chi_Tiet</td>
+                                        <td class="data-table__number">@item.Tong_Tri_Gia.ToString("N2")</td>
+                                        <td>
+                                            @if (string.IsNullOrWhiteSpace(item.Ghi_Chu))
+                                            {
+                                                <span class="data-table__muted">Trống</span>
+                                            }
+                                            else
+                                            {
+                                                @item.Ghi_Chu
+                                            }
+                                        </td>
+                                        <td>
+                                            <div class="action-group">
+                                                <button class="app-button app-button--secondary"
+                                                        @onclick="() => StartEditAsync(item)"
+                                                        @onclick:stopPropagation="true"
+                                                        disabled="@isSaving">
+                                                    Sửa
+                                                </button>
+                                                <button class="app-button app-button--danger"
+                                                        @onclick="() => DeleteAsync(item.Nhap_Kho_ID, item.So_Phieu_Nhap_Kho)"
+                                                        @onclick:stopPropagation="true"
+                                                        disabled="@isSaving">
+                                                    Xóa
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+
+                @if (selectedNhapKhoId.HasValue)
+                {
+                    <section class="detail-panel">
+                        <header class="detail-panel__header">
+                            <h3>Chi tiết phiếu nhập: @selectedSoPhieu</h3>
+                        </header>
+
+                        @if (isDetailLoading)
+                        {
+                            <div class="state-box">Đang tải chi tiết...</div>
+                        }
+                        else if (selectedDetails.Count == 0)
+                        {
+                            <div class="state-box state-box--empty">Phiếu nhập chưa có dòng chi tiết.</div>
+                        }
+                        else
+                        {
+                            <div class="table-wrap">
+                                <table class="detail-table">
+                                    <thead>
+                                        <tr>
+                                            <th>STT</th>
+                                            <th>Mã SP</th>
+                                            <th>Tên sản phẩm</th>
+                                            <th class="detail-table__number">SL nhập</th>
+                                            <th class="detail-table__number">Đơn giá</th>
+                                            <th class="detail-table__number">Trị giá</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @for (var i = 0; i < selectedDetails.Count; i++)
+                                        {
+                                            var detail = selectedDetails[i];
+                                            <tr>
+                                                <td>@(i + 1)</td>
+                                                <td>@detail.Ma_San_Pham</td>
+                                                <td>@detail.Ten_San_Pham</td>
+                                                <td class="detail-table__number">@detail.SL_Nhap.ToString("N2")</td>
+                                                <td class="detail-table__number">@detail.Don_Gia_Nhap.ToString("N2")</td>
+                                                <td class="detail-table__number">@detail.Tri_Gia.ToString("N2")</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                    <tfoot>
+                                        <tr>
+                                            <td colspan="5">Tổng trị giá</td>
+                                            <td class="detail-table__number">@selectedDetails.Sum(x => x.Tri_Gia).ToString("N2")</td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        }
+                    </section>
+                }
+            </div>
+        </section>
+    </div>
+
+    @if (IsFormVisible)
+    {
+        <div class="modal-overlay" @onclick="HandleModalBackdropClick">
+            <section class="card card--form modal-card" @onclick:stopPropagation="true">
+                <header class="card__header card__header--form">
+                    <h2>@(isEditMode ? "Sửa phiếu nhập kho" : "Tạo phiếu nhập kho")</h2>
+                    <div class="modal-header-actions">
+                        <span class="card__tag">@(isEditMode ? "Chế độ chỉnh sửa" : "Chỉ thêm mới")</span>
+                        <button type="button"
+                                class="app-button app-button--ghost app-button--icon"
+                                title="Đóng"
+                                @onclick="CancelForm"
+                                disabled="@isSaving">
+                            ×
+                        </button>
+                    </div>
+                </header>
+
+                <div class="card__body">
+                    <div class="form-shell">
+                        <EditForm Model="formModel" OnValidSubmit="SaveAsync" FormName="NhapKhoForm">
+                            <DataAnnotationsValidator />
+
+                            @if (!string.IsNullOrWhiteSpace(formMessage))
+                            {
+                                <div class="status-banner @(formMessageIsError ? "status-banner--error" : "status-banner--success")" role="alert">
+                                    @formMessage
+                                </div>
+                            }
+
+                            <div class="form-grid">
+                                <div class="form-field form-field--code">
+                                    <div class="form-field__head">
+                                        <label class="form-field__label">Số phiếu nhập <span class="required-mark">*</span></label>
+                                        <span class="form-field__count">@((formModel.So_Phieu_Nhap_Kho?.Length ?? 0))/50</span>
+                                    </div>
+                                    <InputText class="form-field__input"
+                                               @bind-Value="formModel.So_Phieu_Nhap_Kho"
+                                               @oninput="HandleSoPhieuInput"
+                                               maxlength="50"
+                                               placeholder="Nhập số phiếu nhập kho" />
+                                    <p class="form-field__hint">Không được để trống và phải duy nhất.</p>
+                                    <ValidationMessage For="@(() => formModel.So_Phieu_Nhap_Kho)" />
+                                </div>
+
+                                <div class="form-field form-field--lookup">
+                                    <div class="form-field__head">
+                                        <label class="form-field__label">Kho <span class="required-mark">*</span></label>
+                                    </div>
+                                    <InputSelect class="form-field__input" @bind-Value="formModel.Kho_ID">
+                                        <option value="0">-- Chọn kho --</option>
+                                        @foreach (var option in khoOptions)
+                                        {
+                                            <option value="@option.Kho_ID">@option.Ten_Kho</option>
+                                        }
+                                    </InputSelect>
+                                    <ValidationMessage For="@(() => formModel.Kho_ID)" />
+                                </div>
+
+                                <div class="form-field form-field--lookup">
+                                    <div class="form-field__head">
+                                        <label class="form-field__label">Nhà cung cấp <span class="required-mark">*</span></label>
+                                    </div>
+                                    <InputSelect class="form-field__input" @bind-Value="formModel.NCC_ID">
+                                        <option value="0">-- Chọn nhà cung cấp --</option>
+                                        @foreach (var option in nhaCungCapOptions)
+                                        {
+                                            <option value="@option.NCC_ID">@option.Ten_NCC (@option.Ma_NCC)</option>
+                                        }
+                                    </InputSelect>
+                                    <ValidationMessage For="@(() => formModel.NCC_ID)" />
+                                </div>
+
+                                <div class="form-field form-field--date">
+                                    <div class="form-field__head">
+                                        <label class="form-field__label">Ngày nhập kho <span class="required-mark">*</span></label>
+                                    </div>
+                                    <InputText class="form-field__input"
+                                               @bind-Value="ngayNhapKhoText"
+                                               @oninput="HandleNgayNhapKhoInput"
+                                               maxlength="10"
+                                               placeholder="dd/MM/yyyy" />
+                                    <p class="form-field__hint">Định dạng bắt buộc: dd/MM/yyyy.</p>
+                                    <ValidationMessage For="@(() => formModel.Ngay_Nhap_Kho)" />
+                                </div>
+                            </div>
+
+                            <div class="form-field form-field--note">
+                                <div class="form-field__head">
+                                    <label class="form-field__label">Ghi chú</label>
+                                    <span class="form-field__count">@((formModel.Ghi_Chu?.Length ?? 0))/255</span>
+                                </div>
+                                <InputTextArea class="form-field__input form-field__input--multiline"
+                                               @bind-Value="formModel.Ghi_Chu"
+                                               @oninput="HandleGhiChuInput"
+                                               maxlength="255"
+                                               placeholder="Nhập ghi chú" />
+                                <ValidationMessage For="@(() => formModel.Ghi_Chu)" />
+                            </div>
+
+                            <section class="line-section">
+                                <header class="line-section__header">
+                                    <h3>Chi tiết nhập kho</h3>
+                                    <button type="button" class="app-button app-button--secondary" @onclick="AddDetailRow" disabled="@isSaving">
+                                        Thêm dòng
+                                    </button>
+                                </header>
+
+                                <div class="table-wrap">
+                                    <table class="line-table">
+                                        <thead>
+                                            <tr>
+                                                <th class="line-table__index">STT</th>
+                                                <th>Sản phẩm <span class="required-mark">*</span></th>
+                                                <th>Đơn vị tính</th>
+                                                <th class="line-table__number">SL nhập <span class="required-mark">*</span></th>
+                                                <th class="line-table__number">Đơn giá nhập <span class="required-mark">*</span></th>
+                                                <th class="line-table__number">Trị giá</th>
+                                                <th class="line-table__actions">Thao tác</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @for (var i = 0; i < formModel.Chi_Tiets.Count; i++)
+                                            {
+                                                var index = i;
+                                                var line = formModel.Chi_Tiets[index];
+                                                <tr>
+                                                    <td>@(index + 1)</td>
+                                                    <td>
+                                                        <InputSelect class="form-field__input"
+                                                                     @bind-Value="line.San_Pham_ID">
+                                                            <option value="0">-- Chọn sản phẩm --</option>
+                                                            @foreach (var option in sanPhamOptions)
+                                                            {
+                                                                <option value="@option.San_Pham_ID">@option.Ten_San_Pham (@option.Ma_San_Pham)</option>
+                                                            }
+                                                        </InputSelect>
+                                                    </td>
+                                                    <td class="line-table__unit">
+                                                        @GetDonViTinhBySanPhamId(line.San_Pham_ID)
+                                                    </td>
+                                                    <td>
+                                                        <input class="form-field__input line-input--number"
+                                                               value="@line.SL_Nhap_Text"
+                                                               @oninput="e => line.SL_Nhap_Text = e.Value?.ToString() ?? string.Empty"
+                                                               inputmode="decimal"
+                                                               placeholder="Nhập số lượng" />
+                                                    </td>
+                                                    <td>
+                                                        <input class="form-field__input line-input--number"
+                                                               value="@line.Don_Gia_Nhap_Text"
+                                                               @oninput="e => line.Don_Gia_Nhap_Text = e.Value?.ToString() ?? string.Empty"
+                                                               inputmode="decimal"
+                                                               placeholder="Nhập đơn giá" />
+                                                    </td>
+                                                    <td class="line-table__number">@GetLineTriGia(line).ToString("N2")</td>
+                                                    <td>
+                                                        <button type="button"
+                                                                class="app-button app-button--danger"
+                                                                @onclick="() => RemoveDetailRow(index)"
+                                                                disabled="@isSaving">
+                                                            Xóa dòng
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                        <tfoot>
+                                            <tr>
+                                                <td colspan="5">Tổng trị giá</td>
+                                                <td class="line-table__number">@formModel.Chi_Tiets.Sum(GetLineTriGia).ToString("N2")</td>
+                                                <td></td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            </section>
+
+                            <div class="form-actions">
+                                <button type="submit" class="app-button app-button--success" disabled="@(!HasRequiredLookupData || isSaving)">
+                                    @(isSaving ? "Đang lưu..." : isEditMode ? "Lưu cập nhật" : "Lưu phiếu nhập")
+                                </button>
+                                <button type="button" class="app-button app-button--secondary" @onclick="CancelForm" disabled="@isSaving">
+                                    Hủy
+                                </button>
+                            </div>
+                        </EditForm>
+                    </div>
+                </div>
+            </section>
+        </div>
+    }
+</section>
+
+@code {
+    private readonly List<NhapKhoListItemVm> items = [];
+    private readonly List<KhoListItemVm> khoOptions = [];
+    private readonly List<NhaCungCapListItemVm> nhaCungCapOptions = [];
+    private readonly List<SanPhamListItemVm> sanPhamOptions = [];
+    private readonly List<NhapKhoDetailListItemVm> selectedDetails = [];
+    private NhapKhoCreateVm formModel = new();
+    private bool isLoading = true;
+    private bool isSaving;
+    private bool isDetailLoading;
+    private bool isCreateFormVisible;
+    private bool isEditMode;
+    private int? editingNhapKhoId;
+    private int? selectedNhapKhoId;
+    private string? selectedSoPhieu;
+    private string? pageMessage;
+    private bool pageMessageIsError;
+    private string? formMessage;
+    private bool formMessageIsError;
+    private string searchKeyword = string.Empty;
+    private string ngayNhapKhoText = string.Empty;
+
+    private bool IsFormVisible => isCreateFormVisible;
+    private bool HasRequiredLookupData => khoOptions.Count > 0 && nhaCungCapOptions.Count > 0 && sanPhamOptions.Count > 0;
+
+    private IReadOnlyList<NhapKhoListItemVm> FilteredItems
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(searchKeyword))
+            {
+                return items;
+            }
+
+            var keyword = searchKeyword.Trim();
+            return items
+                .Where(x =>
+                    ContainsKeyword(x.So_Phieu_Nhap_Kho, keyword)
+                    || ContainsKeyword(x.Ten_Kho, keyword)
+                    || ContainsKeyword(x.Ten_NCC, keyword)
+                    || ContainsKeyword(x.Ghi_Chu, keyword))
+                .ToList();
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        try
+        {
+            isLoading = true;
+            ClearPageMessage();
+            ClearFormMessage();
+
+            var getNhapKhoTask = NhapKhoService.GetAllAsync();
+            var getKhoTask = KhoService.GetAllAsync();
+            var getNhaCungCapTask = NhaCungCapService.GetAllAsync();
+            var getSanPhamTask = SanPhamService.GetAllAsync();
+
+            await Task.WhenAll(getNhapKhoTask, getKhoTask, getNhaCungCapTask, getSanPhamTask);
+
+            items.Clear();
+            items.AddRange(getNhapKhoTask.Result);
+
+            khoOptions.Clear();
+            khoOptions.AddRange(getKhoTask.Result);
+
+            nhaCungCapOptions.Clear();
+            nhaCungCapOptions.AddRange(getNhaCungCapTask.Result);
+
+            sanPhamOptions.Clear();
+            sanPhamOptions.AddRange(getSanPhamTask.Result);
+
+            if (!HasRequiredLookupData)
+            {
+                pageMessage = "Cần có dữ liệu Kho, Nhà cung cấp và Sản phẩm trước khi tạo phiếu nhập.";
+                pageMessageIsError = true;
+            }
+
+            if (selectedNhapKhoId.HasValue)
+            {
+                var selectedExists = items.Any(x => x.Nhap_Kho_ID == selectedNhapKhoId.Value);
+                if (!selectedExists)
+                {
+                    selectedNhapKhoId = null;
+                    selectedSoPhieu = null;
+                    selectedDetails.Clear();
+                }
+                else
+                {
+                    await LoadDetailsAsync(selectedNhapKhoId.Value, selectedSoPhieu);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Load NhapKho page data failed.");
+            pageMessage = "Không thể tải dữ liệu quản lý phiếu nhập kho.";
+            pageMessageIsError = true;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void StartCreate()
+    {
+        ClearPageMessage();
+        ClearFormMessage();
+
+        if (!HasRequiredLookupData)
+        {
+            pageMessage = "Cần có dữ liệu Kho, Nhà cung cấp và Sản phẩm trước khi tạo phiếu nhập.";
+            pageMessageIsError = true;
+            return;
+        }
+
+        isCreateFormVisible = true;
+        isEditMode = false;
+        editingNhapKhoId = null;
+        ResetFormModel();
+    }
+
+    private void CancelForm()
+    {
+        isCreateFormVisible = false;
+        isEditMode = false;
+        editingNhapKhoId = null;
+        ResetFormModel();
+        ClearFormMessage();
+    }
+
+    private void HandleModalBackdropClick()
+    {
+        if (isSaving)
+        {
+            return;
+        }
+
+        CancelForm();
+    }
+
+    private void ResetFormModel()
+    {
+        formModel = new NhapKhoCreateVm
+        {
+            Nhap_Kho_ID = 0,
+            Ngay_Nhap_Kho = DateTime.Today
+        };
+        ngayNhapKhoText = formModel.Ngay_Nhap_Kho.ToString("dd/MM/yyyy");
+    }
+
+    private async Task StartEditAsync(NhapKhoListItemVm item)
+    {
+        if (isSaving)
+        {
+            return;
+        }
+
+        ClearPageMessage();
+        ClearFormMessage();
+
+        if (!HasRequiredLookupData)
+        {
+            pageMessage = "Cần có dữ liệu Kho, Nhà cung cấp và Sản phẩm trước khi sửa phiếu nhập.";
+            pageMessageIsError = true;
+            return;
+        }
+
+        try
+        {
+            var detailResult = await NhapKhoService.GetDetailsAsync(item.Nhap_Kho_ID);
+            if (!detailResult.Success || detailResult.Data is null)
+            {
+                pageMessage = detailResult.Message;
+                pageMessageIsError = true;
+                return;
+            }
+
+            var detailRows = detailResult.Data
+                .Select(x => new NhapKhoRawDataUpsertVm
+                {
+                    San_Pham_ID = x.San_Pham_ID,
+                    SL_Nhap = x.SL_Nhap,
+                    Don_Gia_Nhap = x.Don_Gia_Nhap,
+                    SL_Nhap_Text = FormatDecimalForInput(x.SL_Nhap),
+                    Don_Gia_Nhap_Text = FormatDecimalForInput(x.Don_Gia_Nhap)
+                })
+                .ToList();
+
+            formModel = new NhapKhoCreateVm
+            {
+                Nhap_Kho_ID = item.Nhap_Kho_ID,
+                So_Phieu_Nhap_Kho = item.So_Phieu_Nhap_Kho,
+                Kho_ID = item.Kho_ID,
+                NCC_ID = item.NCC_ID,
+                Ngay_Nhap_Kho = item.Ngay_Nhap_Kho,
+                Ghi_Chu = item.Ghi_Chu,
+                Chi_Tiets = detailRows.Count > 0 ? detailRows : [new NhapKhoRawDataUpsertVm()]
+            };
+
+            ngayNhapKhoText = formModel.Ngay_Nhap_Kho.ToString("dd/MM/yyyy");
+            isEditMode = true;
+            editingNhapKhoId = item.Nhap_Kho_ID;
+            isCreateFormVisible = true;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Start edit NhapKho failed. Nhap_Kho_ID={Nhap_Kho_ID}", item.Nhap_Kho_ID);
+            pageMessage = "Không thể mở dữ liệu phiếu nhập để chỉnh sửa.";
+            pageMessageIsError = true;
+        }
+    }
+
+    private void AddDetailRow()
+    {
+        formModel.Chi_Tiets.Add(new NhapKhoRawDataUpsertVm());
+    }
+
+    private void RemoveDetailRow(int index)
+    {
+        if (index < 0 || index >= formModel.Chi_Tiets.Count)
+        {
+            return;
+        }
+
+        if (formModel.Chi_Tiets.Count == 1)
+        {
+            formMessage = "Phiếu nhập phải có ít nhất 1 dòng chi tiết.";
+            formMessageIsError = true;
+            return;
+        }
+
+        formModel.Chi_Tiets.RemoveAt(index);
+    }
+
+    private async Task SelectNhapKhoAsync(int nhapKhoId, string soPhieu)
+    {
+        await LoadDetailsAsync(nhapKhoId, soPhieu);
+    }
+
+    private async Task LoadDetailsAsync(int nhapKhoId, string? soPhieu)
+    {
+        isDetailLoading = true;
+        selectedNhapKhoId = nhapKhoId;
+        selectedSoPhieu = soPhieu;
+        selectedDetails.Clear();
+
+        try
+        {
+            var result = await NhapKhoService.GetDetailsAsync(nhapKhoId);
+            if (!result.Success || result.Data is null)
+            {
+                pageMessage = result.Message;
+                pageMessageIsError = true;
+                return;
+            }
+
+            selectedDetails.AddRange(result.Data);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Load NhapKho details failed. Nhap_Kho_ID={Nhap_Kho_ID}", nhapKhoId);
+            pageMessage = "Không thể tải chi tiết phiếu nhập kho.";
+            pageMessageIsError = true;
+        }
+        finally
+        {
+            isDetailLoading = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (!HasRequiredLookupData)
+        {
+            formMessage = "Cần có dữ liệu Kho, Nhà cung cấp và Sản phẩm trước khi lưu.";
+            formMessageIsError = true;
+            return;
+        }
+
+        if (!TryParseNgayNhapKho(out var parsedNgayNhapKho))
+        {
+            formMessage = "Ngày nhập kho phải đúng định dạng dd/MM/yyyy.";
+            formMessageIsError = true;
+            return;
+        }
+
+        if (!TryApplyLineNumericValues(out var lineValidationMessage))
+        {
+            formMessage = lineValidationMessage;
+            formMessageIsError = true;
+            return;
+        }
+
+        formModel.Ngay_Nhap_Kho = parsedNgayNhapKho;
+
+        isSaving = true;
+        ClearFormMessage();
+        ClearPageMessage();
+
+        try
+        {
+            ServiceResult result;
+            if (isEditMode)
+            {
+                formModel.Nhap_Kho_ID = editingNhapKhoId ?? formModel.Nhap_Kho_ID;
+                result = await NhapKhoService.UpdateAsync(formModel);
+            }
+            else
+            {
+                result = await NhapKhoService.CreateAsync(formModel);
+            }
+
+            formMessage = result.Message;
+            formMessageIsError = !result.Success;
+            if (!result.Success)
+            {
+                return;
+            }
+
+            await LoadDataAsync();
+            CancelForm();
+            pageMessage = result.Message;
+            pageMessageIsError = false;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(
+                ex,
+                "Save NhapKho failed. IsEditMode={IsEditMode}, Nhap_Kho_ID={Nhap_Kho_ID}, So_Phieu_Nhap_Kho={So_Phieu_Nhap_Kho}",
+                isEditMode,
+                formModel.Nhap_Kho_ID,
+                formModel.So_Phieu_Nhap_Kho);
+            formMessage = "Không thể lưu phiếu nhập do lỗi hệ thống.";
+            formMessageIsError = true;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task DeleteAsync(int id, string soPhieuNhapKho)
+    {
+        ClearPageMessage();
+        ClearFormMessage();
+
+        var confirmed = await JS.InvokeAsync<bool>(
+            "confirm",
+            $"Xóa phiếu nhập '{soPhieuNhapKho}' khỏi danh sách hiển thị? Dữ liệu vẫn được lưu trong hệ thống.");
+
+        if (!confirmed)
+        {
+            return;
+        }
+
+        var result = await NhapKhoService.DeleteAsync(id);
+        pageMessage = result.Message;
+        pageMessageIsError = !result.Success;
+
+        if (!result.Success)
+        {
+            return;
+        }
+
+        if (selectedNhapKhoId == id)
+        {
+            selectedNhapKhoId = null;
+            selectedSoPhieu = null;
+            selectedDetails.Clear();
+        }
+
+        await LoadDataAsync();
+        pageMessage = result.Message;
+        pageMessageIsError = false;
+    }
+
+    private void ClearSearch()
+    {
+        searchKeyword = string.Empty;
+    }
+
+    private void HandleSearchInput(ChangeEventArgs args)
+    {
+        searchKeyword = args.Value?.ToString() ?? string.Empty;
+    }
+
+    private void HandleSoPhieuInput(ChangeEventArgs args)
+    {
+        formModel.So_Phieu_Nhap_Kho = args.Value?.ToString() ?? string.Empty;
+    }
+
+    private void HandleGhiChuInput(ChangeEventArgs args)
+    {
+        formModel.Ghi_Chu = args.Value?.ToString();
+    }
+
+    private void HandleNgayNhapKhoInput(ChangeEventArgs args)
+    {
+        ngayNhapKhoText = args.Value?.ToString() ?? string.Empty;
+    }
+
+    private void ClearPageMessage()
+    {
+        pageMessage = null;
+        pageMessageIsError = false;
+    }
+
+    private void ClearFormMessage()
+    {
+        formMessage = null;
+        formMessageIsError = false;
+    }
+
+    private static bool ContainsKeyword(string? source, string keyword)
+    {
+        return !string.IsNullOrWhiteSpace(source)
+               && source.Contains(keyword, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool TryParseNgayNhapKhoText(string value, out DateTime parsedDate)
+    {
+        return DateTime.TryParseExact(
+            value,
+            "dd/MM/yyyy",
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.None,
+            out parsedDate);
+    }
+
+    private bool TryParseNgayNhapKho(out DateTime parsedDate)
+    {
+        if (string.IsNullOrWhiteSpace(ngayNhapKhoText))
+        {
+            parsedDate = default;
+            return false;
+        }
+
+        return TryParseNgayNhapKhoText(ngayNhapKhoText.Trim(), out parsedDate);
+    }
+
+    private bool TryApplyLineNumericValues(out string message)
+    {
+        if (formModel.Chi_Tiets.Count == 0)
+        {
+            message = "Phiếu nhập phải có ít nhất 1 dòng chi tiết.";
+            return false;
+        }
+
+        for (var i = 0; i < formModel.Chi_Tiets.Count; i++)
+        {
+            var lineNo = i + 1;
+            var line = formModel.Chi_Tiets[i];
+
+            if (!TryParsePositiveDecimal(line.SL_Nhap_Text, out var soLuong))
+            {
+                message = $"Dòng {lineNo}: Số lượng nhập phải là số lớn hơn 0.";
+                return false;
+            }
+
+            if (!TryParsePositiveDecimal(line.Don_Gia_Nhap_Text, out var donGia))
+            {
+                message = $"Dòng {lineNo}: Đơn giá nhập phải là số lớn hơn 0.";
+                return false;
+            }
+
+            line.SL_Nhap = decimal.Round(soLuong, 2, MidpointRounding.AwayFromZero);
+            line.Don_Gia_Nhap = decimal.Round(donGia, 2, MidpointRounding.AwayFromZero);
+        }
+
+        message = string.Empty;
+        return true;
+    }
+
+    private static bool TryParsePositiveDecimal(string? text, out decimal parsedValue)
+    {
+        if (!TryParseDecimalFlexible(text, out parsedValue))
+        {
+            return false;
+        }
+
+        return parsedValue > 0;
+    }
+
+    private static bool TryParseDecimalFlexible(string? text, out decimal parsedValue)
+    {
+        parsedValue = 0m;
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return false;
+        }
+
+        var raw = text.Trim().Replace(" ", string.Empty, StringComparison.Ordinal);
+        if (raw.StartsWith('+'))
+        {
+            raw = raw[1..];
+        }
+
+        if (raw.Length == 0 || raw.Any(ch => !char.IsDigit(ch) && ch is not ',' and not '.'))
+        {
+            return false;
+        }
+
+        string normalized;
+        if (raw.Contains(',') && raw.Contains('.'))
+        {
+            normalized = NormalizeMixedSeparators(raw);
+        }
+        else if (raw.Contains(','))
+        {
+            normalized = NormalizeSingleSeparator(raw, ',');
+        }
+        else if (raw.Contains('.'))
+        {
+            normalized = NormalizeSingleSeparator(raw, '.');
+        }
+        else
+        {
+            normalized = raw;
+        }
+
+        return decimal.TryParse(
+            normalized,
+            NumberStyles.AllowDecimalPoint,
+            CultureInfo.InvariantCulture,
+            out parsedValue);
+    }
+
+    private static string NormalizeMixedSeparators(string raw)
+    {
+        var lastComma = raw.LastIndexOf(',');
+        var lastDot = raw.LastIndexOf('.');
+        var decimalSeparator = lastComma > lastDot ? ',' : '.';
+        var thousandsSeparator = decimalSeparator == ',' ? '.' : ',';
+
+        var withoutThousands = raw.Replace(thousandsSeparator.ToString(), string.Empty, StringComparison.Ordinal);
+        var lastDecimalIndex = withoutThousands.LastIndexOf(decimalSeparator);
+        if (lastDecimalIndex < 0)
+        {
+            return withoutThousands.Replace(decimalSeparator.ToString(), string.Empty, StringComparison.Ordinal);
+        }
+
+        var integerPart = withoutThousands[..lastDecimalIndex]
+            .Replace(decimalSeparator.ToString(), string.Empty, StringComparison.Ordinal);
+        var fractionPart = withoutThousands[(lastDecimalIndex + 1)..]
+            .Replace(decimalSeparator.ToString(), string.Empty, StringComparison.Ordinal);
+
+        return fractionPart.Length == 0
+            ? integerPart
+            : $"{integerPart}.{fractionPart}";
+    }
+
+    private static string NormalizeSingleSeparator(string raw, char separator)
+    {
+        var parts = raw.Split(separator, StringSplitOptions.None);
+        if (parts.Length == 1)
+        {
+            return raw;
+        }
+
+        if (parts.Any(part => part.Length == 0))
+        {
+            return raw;
+        }
+
+        if (parts.Length == 2)
+        {
+            return parts[1].Length == 3
+                ? string.Concat(parts[0], parts[1])
+                : $"{parts[0]}.{parts[1]}";
+        }
+
+        var integerPart = string.Concat(parts[..^1]);
+        var fractionPart = parts[^1];
+
+        return fractionPart.Length == 3
+            ? string.Concat(integerPart, fractionPart)
+            : $"{integerPart}.{fractionPart}";
+    }
+
+    private static decimal GetLineSoLuong(NhapKhoRawDataUpsertVm line)
+    {
+        return TryParsePositiveDecimal(line.SL_Nhap_Text, out var value) ? value : 0m;
+    }
+
+    private static decimal GetLineDonGia(NhapKhoRawDataUpsertVm line)
+    {
+        return TryParsePositiveDecimal(line.Don_Gia_Nhap_Text, out var value) ? value : 0m;
+    }
+
+    private static decimal GetLineTriGia(NhapKhoRawDataUpsertVm line)
+    {
+        return GetLineSoLuong(line) * GetLineDonGia(line);
+    }
+
+    private static string FormatDecimalForInput(decimal value)
+    {
+        return value.ToString("0.##", CultureInfo.InvariantCulture);
+    }
+
+    private string GetDonViTinhBySanPhamId(int sanPhamId)
+    {
+        if (sanPhamId <= 0)
+        {
+            return "—";
+        }
+
+        return sanPhamOptions.FirstOrDefault(x => x.San_Pham_ID == sanPhamId)?.Ten_Don_Vi_Tinh ?? "—";
+    }
+}

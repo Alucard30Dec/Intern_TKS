@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 namespace BlazorApp1.Infrastructure.Data;
 
 /// <summary>
-/// DbContext quan ly schema va truy cap du lieu cho bai 1, bai 2, bai 3, bai 4, bai 5 va bai 6.
+/// DbContext quan ly schema va truy cap du lieu cho bai 1, bai 2, bai 3, bai 4, bai 5, bai 6 va bai 7.
 /// </summary>
 public sealed class AppDbContext : DbContext
 {
@@ -44,6 +44,16 @@ public sealed class AppDbContext : DbContext
     /// Bang phan quyen kho-user (bai 6).
     /// </summary>
     public DbSet<KhoUser> KhoUsers => Set<KhoUser>();
+
+    /// <summary>
+    /// Bang phieu nhap kho (bai 7).
+    /// </summary>
+    public DbSet<NhapKho> NhapKhos => Set<NhapKho>();
+
+    /// <summary>
+    /// Bang chi tiet phieu nhap kho (bai 7).
+    /// </summary>
+    public DbSet<NhapKhoRawData> NhapKhoRawDatas => Set<NhapKhoRawData>();
 
     /// <summary>
     /// Cau hinh mapping bang/cot/index de giu ten schema dung theo de bai SQL.
@@ -276,6 +286,119 @@ public sealed class AppDbContext : DbContext
                 .HasForeignKey(x => x.Kho_ID)
                 .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("FK_tbl_DM_Kho_User_tbl_DM_Kho_Kho_ID");
+        });
+
+        modelBuilder.Entity<NhapKho>(entity =>
+        {
+            entity.ToTable("tbl_DM_Nhap_Kho");
+
+            entity.HasKey(x => x.Nhap_Kho_ID);
+
+            entity.Property(x => x.Nhap_Kho_ID)
+                .HasColumnName("Nhap_Kho_ID");
+
+            entity.Property(x => x.So_Phieu_Nhap_Kho)
+                .HasColumnName("So_Phieu_Nhap_Kho")
+                .HasMaxLength(50)
+                .IsRequired();
+
+            entity.Property(x => x.Kho_ID)
+                .HasColumnName("Kho_ID")
+                .IsRequired();
+
+            entity.Property(x => x.NCC_ID)
+                .HasColumnName("NCC_ID")
+                .IsRequired();
+
+            entity.Property(x => x.Ngay_Nhap_Kho)
+                .HasColumnName("Ngay_Nhap_Kho")
+                .HasColumnType("date")
+                .IsRequired();
+
+            entity.Property(x => x.Ghi_Chu)
+                .HasColumnName("Ghi_Chu")
+                .HasMaxLength(255);
+
+            entity.Property(x => x.Is_Active)
+                .HasColumnName("Is_Active")
+                .HasDefaultValue(true)
+                .IsRequired();
+
+            entity.HasIndex(x => x.So_Phieu_Nhap_Kho)
+                .HasDatabaseName("UQ_tbl_DM_Nhap_Kho_So_Phieu_Nhap_Kho")
+                .IsUnique();
+
+            entity.HasIndex(x => x.Kho_ID)
+                .HasDatabaseName("IX_tbl_DM_Nhap_Kho_Kho_ID");
+
+            entity.HasIndex(x => x.NCC_ID)
+                .HasDatabaseName("IX_tbl_DM_Nhap_Kho_NCC_ID");
+
+            entity.HasIndex(x => x.Ngay_Nhap_Kho)
+                .HasDatabaseName("IX_tbl_DM_Nhap_Kho_Ngay_Nhap_Kho");
+
+            entity.HasOne(x => x.Kho)
+                .WithMany()
+                .HasForeignKey(x => x.Kho_ID)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("FK_tbl_DM_Nhap_Kho_tbl_DM_Kho_Kho_ID");
+
+            entity.HasOne(x => x.NCC)
+                .WithMany()
+                .HasForeignKey(x => x.NCC_ID)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("FK_tbl_DM_Nhap_Kho_tbl_DM_NCC_NCC_ID");
+        });
+
+        modelBuilder.Entity<NhapKhoRawData>(entity =>
+        {
+            entity.ToTable("tbl_DM_Nhap_Kho_Raw_Data");
+
+            entity.HasKey(x => x.Nhap_Kho_Raw_Data_ID);
+
+            entity.Property(x => x.Nhap_Kho_Raw_Data_ID)
+                .HasColumnName("Nhap_Kho_Raw_Data_ID");
+
+            entity.Property(x => x.Nhap_Kho_ID)
+                .HasColumnName("Nhap_Kho_ID")
+                .IsRequired();
+
+            entity.Property(x => x.San_Pham_ID)
+                .HasColumnName("San_Pham_ID")
+                .IsRequired();
+
+            entity.Property(x => x.SL_Nhap)
+                .HasColumnName("SL_Nhap")
+                .HasPrecision(18, 2)
+                .IsRequired();
+
+            entity.Property(x => x.Don_Gia_Nhap)
+                .HasColumnName("Don_Gia_Nhap")
+                .HasPrecision(18, 2)
+                .IsRequired();
+
+            entity.Property(x => x.Is_Active)
+                .HasColumnName("Is_Active")
+                .HasDefaultValue(true)
+                .IsRequired();
+
+            entity.HasIndex(x => x.Nhap_Kho_ID)
+                .HasDatabaseName("IX_tbl_DM_Nhap_Kho_Raw_Data_Nhap_Kho_ID");
+
+            entity.HasIndex(x => x.San_Pham_ID)
+                .HasDatabaseName("IX_tbl_DM_Nhap_Kho_Raw_Data_San_Pham_ID");
+
+            entity.HasOne(x => x.Nhap_Kho)
+                .WithMany(x => x.Nhap_Kho_Raw_Datas)
+                .HasForeignKey(x => x.Nhap_Kho_ID)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("FK_tbl_DM_Nhap_Kho_Raw_Data_tbl_DM_Nhap_Kho_Nhap_Kho_ID");
+
+            entity.HasOne(x => x.San_Pham)
+                .WithMany()
+                .HasForeignKey(x => x.San_Pham_ID)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("FK_tbl_DM_Nhap_Kho_Raw_Data_tbl_DM_San_Pham_San_Pham_ID");
         });
     }
 }
