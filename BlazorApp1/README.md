@@ -1,4 +1,4 @@
-# BlazorApp1 - Bai 1 + Bai 2 + Bai 3 + Bai 4 + Bai 5 Danh Muc
+# BlazorApp1 - Bai 1 + Bai 2 + Bai 3 + Bai 4 + Bai 5 + Bai 6
 
 Ung dung Blazor Server (.NET 8) cho bai thuc tap:
 
@@ -7,8 +7,9 @@ Ung dung Blazor Server (.NET 8) cho bai thuc tap:
 - Bai 3: Danh muc san pham (`/danh-muc/san-pham`)
 - Bai 4: Danh muc nha cung cap (`/danh-muc/nha-cung-cap`)
 - Bai 5: Danh muc kho (`/danh-muc/kho`)
+- Bai 6: Phan quyen kho-user (`/phan-quyen/kho-user`)
 
-Du an dung PostgreSQL + EF Core, co validation va CRUD day du cho 5 danh muc.
+Du an dung PostgreSQL + EF Core, co validation va CRUD/phan quyen day du cho Bai 1 den Bai 6.
 
 ## 1) Yeu cau moi truong
 
@@ -51,6 +52,7 @@ Migration hien co:
 - `20260420075926_AddActiveStatusForCatalogSoftDelete`
 - `20260420082628_AddNhaCungCapCatalogForBai4`
 - `20260420084121_AddKhoCatalogAndRequireUniqueSupplierCode`
+- `20260420085334_AddKhoUserPermissionForBai6`
 
 Cap nhat DB:
 
@@ -73,7 +75,7 @@ dotnet build
 dotnet run
 ```
 
-Mo URL in trong console, sau do vao menu Bai 1/Bai 2/Bai 3/Bai 4/Bai 5 de kiem tra.
+Mo URL in trong console, sau do vao menu Bai 1/Bai 2/Bai 3/Bai 4/Bai 5/Bai 6 de kiem tra.
 
 ## 6) Smoke test nhanh
 
@@ -82,7 +84,8 @@ Mo URL in trong console, sau do vao menu Bai 1/Bai 2/Bai 3/Bai 4/Bai 5 de kiem t
 3. Bai 3: tao, sua, tim kiem theo ma/ten/loai/don vi tinh, xoa mem san pham (an khoi UI).
 4. Bai 4: tao, sua, tim kiem theo ma/ten/ghi chu, xoa mem nha cung cap (an khoi UI), ma NCC bat buoc va duy nhat.
 5. Bai 5: tao, sua, tim kiem theo ten/ghi chu, xoa mem kho (an khoi UI).
-6. Reload trang, xac nhan du lieu van ton tai.
+6. Bai 6: them/sua/tim kiem phan quyen kho-user theo `Ma_Dang_Nhap`, `Kho_ID`; bo key `Ma_Dang_Nhap + Kho_ID` la duy nhat; xoa mem an khoi UI.
+7. Reload trang, xac nhan du lieu van ton tai.
 
 Luu y nghiep vu xoa:
 

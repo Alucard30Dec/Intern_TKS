@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 namespace BlazorApp1.Infrastructure.Data;
 
 /// <summary>
-/// DbContext quan ly schema va truy cap du lieu cho bai 1, bai 2, bai 3, bai 4 va bai 5.
+/// DbContext quan ly schema va truy cap du lieu cho bai 1, bai 2, bai 3, bai 4, bai 5 va bai 6.
 /// </summary>
 public sealed class AppDbContext : DbContext
 {
@@ -39,6 +39,11 @@ public sealed class AppDbContext : DbContext
     /// Bang danh muc kho (bai 5).
     /// </summary>
     public DbSet<Kho> Khos => Set<Kho>();
+
+    /// <summary>
+    /// Bang phan quyen kho-user (bai 6).
+    /// </summary>
+    public DbSet<KhoUser> KhoUsers => Set<KhoUser>();
 
     /// <summary>
     /// Cau hinh mapping bang/cot/index de giu ten schema dung theo de bai SQL.
@@ -234,6 +239,43 @@ public sealed class AppDbContext : DbContext
             entity.HasIndex(x => x.Ten_Kho)
                 .HasDatabaseName("UQ_tbl_DM_Kho_Ten_Kho")
                 .IsUnique();
+        });
+
+        modelBuilder.Entity<KhoUser>(entity =>
+        {
+            entity.ToTable("tbl_DM_Kho_User");
+
+            entity.HasKey(x => x.Kho_User_ID);
+
+            entity.Property(x => x.Kho_User_ID)
+                .HasColumnName("Kho_User_ID");
+
+            entity.Property(x => x.Ma_Dang_Nhap)
+                .HasColumnName("Ma_Dang_Nhap")
+                .HasMaxLength(100)
+                .IsRequired();
+
+            entity.Property(x => x.Kho_ID)
+                .HasColumnName("Kho_ID")
+                .IsRequired();
+
+            entity.Property(x => x.Is_Active)
+                .HasColumnName("Is_Active")
+                .HasDefaultValue(true)
+                .IsRequired();
+
+            entity.HasIndex(x => new { x.Ma_Dang_Nhap, x.Kho_ID })
+                .HasDatabaseName("UQ_tbl_DM_Kho_User_Ma_Dang_Nhap_Kho_ID")
+                .IsUnique();
+
+            entity.HasIndex(x => x.Kho_ID)
+                .HasDatabaseName("IX_tbl_DM_Kho_User_Kho_ID");
+
+            entity.HasOne(x => x.Kho)
+                .WithMany()
+                .HasForeignKey(x => x.Kho_ID)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("FK_tbl_DM_Kho_User_tbl_DM_Kho_Kho_ID");
         });
     }
 }

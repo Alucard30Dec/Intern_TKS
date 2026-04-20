@@ -1,0 +1,417 @@
+@page "/phan-quyen/kho-user"
+@rendermode InteractiveServer
+@using BlazorApp1.Models.Kho
+@using BlazorApp1.Models.KhoUser
+@using BlazorApp1.Services.Interfaces
+@inject IKhoUserService KhoUserService
+@inject IKhoService KhoService
+@inject IJSRuntime JS
+@inject ILogger<KhoUserPage> Logger
+
+<PageTitle>Phân quyền kho-user</PageTitle>
+
+<section class="warehouse-user-page">
+    @{
+        var filteredItems = FilteredItems;
+    }
+
+    <header class="page-header">
+        <h1>Phân quyền kho-user</h1>
+        <button type="button" class="app-button app-button--primary" @onclick="StartCreate" disabled="@isSaving">
+            Thêm mới
+        </button>
+    </header>
+
+    @if (!string.IsNullOrWhiteSpace(pageMessage))
+    {
+        <div class="status-banner @(pageMessageIsError ? "status-banner--error" : "status-banner--success")" role="alert">
+            @pageMessage
+        </div>
+    }
+
+    <div class="warehouse-user-layout @(IsFormVisible ? string.Empty : "warehouse-user-layout--single")">
+        <section class="card card--list">
+            <header class="card__header card__header--toolbar">
+                <h2>Danh sách (@filteredItems.Count)</h2>
+                <div class="toolbar">
+                    <label class="search-field">
+                        <span class="search-field__label">Tìm kiếm</span>
+                        <input class="search-field__input"
+                               value="@searchKeyword"
+                               @oninput="HandleSearchInput"
+                               placeholder="Mã đăng nhập hoặc kho" />
+                    </label>
+                    @if (!string.IsNullOrWhiteSpace(searchKeyword))
+                    {
+                        <button type="button" class="app-button app-button--ghost" @onclick="ClearSearch">
+                            Xóa
+                        </button>
+                    }
+                </div>
+            </header>
+
+            <div class="card__body card__body--table">
+                @if (isLoading)
+                {
+                    <div class="state-box">Đang tải dữ liệu...</div>
+                }
+                else if (items.Count == 0)
+                {
+                    <div class="state-box state-box--empty">Chưa có dữ liệu.</div>
+                }
+                else if (filteredItems.Count == 0)
+                {
+                    <div class="state-box state-box--empty">Không có kết quả phù hợp.</div>
+                }
+                else
+                {
+                    <div class="table-wrap">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th class="data-table__index">STT</th>
+                                    <th>Mã đăng nhập</th>
+                                    <th>Kho</th>
+                                    <th class="data-table__actions">Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @for (var i = 0; i < filteredItems.Count; i++)
+                                {
+                                    var item = filteredItems[i];
+
+                                    <tr class="@(formModel.Kho_User_ID == item.Kho_User_ID ? "data-table__row data-table__row--active" : "data-table__row")"
+                                        @onclick="() => StartEditAsync(item.Kho_User_ID)">
+                                        <td>@(i + 1)</td>
+                                        <td class="data-table__code-value">@item.Ma_Dang_Nhap</td>
+                                        <td class="data-table__name">@item.Ten_Kho</td>
+                                        <td>
+                                            <div class="action-group">
+                                                <button class="app-button app-button--danger"
+                                                        @onclick="() => DeleteAsync(item.Kho_User_ID, item.Ma_Dang_Nhap, item.Ten_Kho)"
+                                                        @onclick:stopPropagation="true"
+                                                        disabled="@isSaving">
+                                                    Xóa
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </section>
+
+        @if (IsFormVisible)
+        {
+            <section class="card card--form">
+                <header class="card__header card__header--form">
+                    <h2>@FormTitle</h2>
+                    <span class="card__tag">@FormModeLabel</span>
+                </header>
+
+                <div class="card__body">
+                    <div class="form-shell">
+                        <EditForm Model="formModel" OnValidSubmit="SaveAsync" FormName="KhoUserForm">
+                            <DataAnnotationsValidator />
+
+                            @if (!string.IsNullOrWhiteSpace(formMessage))
+                            {
+                                <div class="status-banner @(formMessageIsError ? "status-banner--error" : "status-banner--success")" role="alert">
+                                    @formMessage
+                                </div>
+                            }
+
+                            <div class="form-field form-field--code">
+                                <div class="form-field__head">
+                                    <label class="form-field__label">Mã đăng nhập <span class="required-mark">*</span></label>
+                                    <span class="form-field__count">@((formModel.Ma_Dang_Nhap?.Length ?? 0))/100</span>
+                                </div>
+                                <InputText class="form-field__input"
+                                           @bind-Value="formModel.Ma_Dang_Nhap"
+                                           @oninput="HandleMaDangNhapInput"
+                                           maxlength="100"
+                                           placeholder="Nhập mã đăng nhập" />
+                                <p class="form-field__hint">Không được để trống.</p>
+                                <ValidationMessage For="@(() => formModel.Ma_Dang_Nhap)" />
+                            </div>
+
+                            <div class="form-field form-field--lookup">
+                                <div class="form-field__head">
+                                    <label class="form-field__label">Kho <span class="required-mark">*</span></label>
+                                </div>
+                                <InputSelect class="form-field__input"
+                                             @bind-Value="formModel.Kho_ID">
+                                    <option value="0">-- Chọn kho --</option>
+                                    @foreach (var option in khoOptions)
+                                    {
+                                        <option value="@option.Kho_ID">@option.Ten_Kho</option>
+                                    }
+                                </InputSelect>
+                                <p class="form-field__hint">Bộ mã đăng nhập và kho phải duy nhất.</p>
+                                <ValidationMessage For="@(() => formModel.Kho_ID)" />
+                            </div>
+
+                            <div class="form-actions">
+                                <button type="submit" class="app-button app-button--success" disabled="@(!HasKhoOptions || isSaving)">
+                                    @(isSaving ? "Đang lưu..." : "Lưu")
+                                </button>
+                                <button type="button" class="app-button app-button--secondary" @onclick="CancelForm" disabled="@isSaving">
+                                    Hủy
+                                </button>
+                            </div>
+                        </EditForm>
+                    </div>
+                </div>
+            </section>
+        }
+    </div>
+</section>
+
+@code {
+    private readonly List<KhoUserListItemVm> items = [];
+    private readonly List<KhoListItemVm> khoOptions = [];
+    private KhoUserUpsertVm formModel = new();
+    private bool isLoading = true;
+    private bool isSaving;
+    private string? pageMessage;
+    private bool pageMessageIsError;
+    private string? formMessage;
+    private bool formMessageIsError;
+    private string searchKeyword = string.Empty;
+    private FormMode currentFormMode = FormMode.None;
+
+    private bool IsFormVisible => currentFormMode != FormMode.None;
+    private bool IsEditing => currentFormMode == FormMode.Edit;
+    private bool HasKhoOptions => khoOptions.Count > 0;
+    private string FormTitle => IsEditing ? "Sửa phân quyền kho-user" : "Tạo phân quyền kho-user";
+    private string FormModeLabel => IsEditing ? "Đang sửa" : "Đang tạo";
+
+    private IReadOnlyList<KhoUserListItemVm> FilteredItems
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(searchKeyword))
+            {
+                return items;
+            }
+
+            var keyword = searchKeyword.Trim();
+            return items
+                .Where(x =>
+                    ContainsKeyword(x.Ma_Dang_Nhap, keyword)
+                    || ContainsKeyword(x.Ten_Kho, keyword))
+                .ToList();
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        try
+        {
+            isLoading = true;
+            ClearPageMessage();
+            ClearFormMessage();
+
+            var getKhoUserTask = KhoUserService.GetAllAsync();
+            var getKhoTask = KhoService.GetAllAsync();
+
+            await Task.WhenAll(getKhoUserTask, getKhoTask);
+
+            items.Clear();
+            items.AddRange(getKhoUserTask.Result);
+
+            khoOptions.Clear();
+            khoOptions.AddRange(getKhoTask.Result);
+
+            if (!HasKhoOptions)
+            {
+                pageMessage = "Cần có dữ liệu kho trước khi phân quyền.";
+                pageMessageIsError = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Load KhoUser list failed.");
+            pageMessage = "Không thể tải danh sách phân quyền kho-user.";
+            pageMessageIsError = true;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void StartCreate()
+    {
+        ClearPageMessage();
+        ClearFormMessage();
+
+        if (!HasKhoOptions)
+        {
+            pageMessage = "Cần có dữ liệu kho trước khi phân quyền.";
+            pageMessageIsError = true;
+            return;
+        }
+
+        currentFormMode = FormMode.Create;
+        ResetFormModel();
+    }
+
+    private async Task StartEditAsync(int id)
+    {
+        ClearPageMessage();
+        ClearFormMessage();
+
+        var result = await KhoUserService.GetByIdAsync(id);
+        if (!result.Success || result.Data is null)
+        {
+            pageMessage = result.Message;
+            pageMessageIsError = true;
+            return;
+        }
+
+        formModel = new KhoUserUpsertVm
+        {
+            Kho_User_ID = result.Data.Kho_User_ID,
+            Ma_Dang_Nhap = result.Data.Ma_Dang_Nhap,
+            Kho_ID = result.Data.Kho_ID
+        };
+        currentFormMode = FormMode.Edit;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (!HasKhoOptions)
+        {
+            formMessage = "Cần có dữ liệu kho trước khi lưu.";
+            formMessageIsError = true;
+            return;
+        }
+
+        isSaving = true;
+        ClearFormMessage();
+        ClearPageMessage();
+
+        try
+        {
+            var result = formModel.Kho_User_ID == 0
+                ? await KhoUserService.CreateAsync(formModel)
+                : await KhoUserService.UpdateAsync(formModel);
+
+            formMessage = result.Message;
+            formMessageIsError = !result.Success;
+            if (!result.Success)
+            {
+                return;
+            }
+
+            await LoadDataAsync();
+            CancelForm();
+            pageMessage = result.Message;
+            pageMessageIsError = false;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Save KhoUser failed. Kho_User_ID={Kho_User_ID}", formModel.Kho_User_ID);
+            formMessage = "Không thể lưu dữ liệu do lỗi hệ thống.";
+            formMessageIsError = true;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task DeleteAsync(int id, string maDangNhap, string tenKho)
+    {
+        ClearPageMessage();
+        ClearFormMessage();
+
+        var confirmed = await JS.InvokeAsync<bool>(
+            "confirm",
+            $"Xóa phân quyền '{maDangNhap} - {tenKho}' khỏi danh sách hiển thị? Dữ liệu vẫn được lưu trong hệ thống.");
+
+        if (!confirmed)
+        {
+            return;
+        }
+
+        var result = await KhoUserService.DeleteAsync(id);
+        pageMessage = result.Message;
+        pageMessageIsError = !result.Success;
+
+        if (!result.Success)
+        {
+            return;
+        }
+
+        if (formModel.Kho_User_ID == id)
+        {
+            CancelForm();
+        }
+
+        await LoadDataAsync();
+        pageMessage = result.Message;
+        pageMessageIsError = false;
+    }
+
+    private void CancelForm()
+    {
+        currentFormMode = FormMode.None;
+        ResetFormModel();
+        ClearFormMessage();
+    }
+
+    private void ResetFormModel()
+    {
+        formModel = new KhoUserUpsertVm();
+    }
+
+    private void ClearSearch()
+    {
+        searchKeyword = string.Empty;
+    }
+
+    private void HandleSearchInput(ChangeEventArgs args)
+    {
+        searchKeyword = args.Value?.ToString() ?? string.Empty;
+    }
+
+    private void HandleMaDangNhapInput(ChangeEventArgs args)
+    {
+        formModel.Ma_Dang_Nhap = args.Value?.ToString() ?? string.Empty;
+    }
+
+    private void ClearPageMessage()
+    {
+        pageMessage = null;
+        pageMessageIsError = false;
+    }
+
+    private void ClearFormMessage()
+    {
+        formMessage = null;
+        formMessageIsError = false;
+    }
+
+    private static bool ContainsKeyword(string? source, string keyword)
+    {
+        return !string.IsNullOrWhiteSpace(source)
+               && source.Contains(keyword, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private enum FormMode
+    {
+        None = 0,
+        Create = 1,
+        Edit = 2
+    }
+}
