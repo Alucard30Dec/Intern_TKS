@@ -29,7 +29,7 @@ public interface IDonViTinhService
     Task<ServiceResult> UpdateAsync(DonViTinhUpsertVm model, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Xoa don vi tinh theo ID.
+    /// Xoa ban ghi khoi danh sach hien thi (soft delete).
     /// </summary>
     Task<ServiceResult> DeleteAsync(int id, CancellationToken cancellationToken = default);
 }

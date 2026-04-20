@@ -1,11 +1,14 @@
-# BlazorApp1 - Bai 1 + Bai 2 Danh Muc
+# BlazorApp1 - Bai 1 + Bai 2 + Bai 3 + Bai 4 + Bai 5 Danh Muc
 
 Ung dung Blazor Server (.NET 8) cho bai thuc tap:
 
 - Bai 1: Danh muc don vi tinh (`/` hoac `/danh-muc/don-vi-tinh`)
 - Bai 2: Danh muc loai san pham (`/danh-muc/loai-san-pham`)
+- Bai 3: Danh muc san pham (`/danh-muc/san-pham`)
+- Bai 4: Danh muc nha cung cap (`/danh-muc/nha-cung-cap`)
+- Bai 5: Danh muc kho (`/danh-muc/kho`)
 
-Du an dung PostgreSQL + EF Core, co validation va CRUD day du cho ca 2 danh muc.
+Du an dung PostgreSQL + EF Core, co validation va CRUD day du cho 5 danh muc.
 
 ## 1) Yeu cau moi truong
 
@@ -41,6 +44,13 @@ Migration hien co:
 
 - `20260420030829_InitialPostgres`
 - `20260420064607_AlignSchemaForBai2`
+- `20260420071022_AlignTableColumnNamesWithSpec`
+- `20260420071328_CleanupLegacyConstraintNames`
+- `20260420072259_AlignCodePropertyNamesWithSpec`
+- `20260420074221_AddSanPhamCatalogForBai3`
+- `20260420075926_AddActiveStatusForCatalogSoftDelete`
+- `20260420082628_AddNhaCungCapCatalogForBai4`
+- `20260420084121_AddKhoCatalogAndRequireUniqueSupplierCode`
 
 Cap nhat DB:
 
@@ -63,13 +73,21 @@ dotnet build
 dotnet run
 ```
 
-Mo URL in trong console, sau do vao menu Bai 1/Bai 2 de kiem tra.
+Mo URL in trong console, sau do vao menu Bai 1/Bai 2/Bai 3/Bai 4/Bai 5 de kiem tra.
 
 ## 6) Smoke test nhanh
 
-1. Bai 1: tao, sua, tim kiem, xoa don vi tinh.
-2. Bai 2: tao, sua, tim kiem theo ma/ten/ghi chu, xoa loai san pham.
-3. Reload trang, xac nhan du lieu van ton tai.
+1. Bai 1: tao, sua, tim kiem, xoa mem don vi tinh (an khoi UI).
+2. Bai 2: tao, sua, tim kiem theo ma/ten/ghi chu, xoa mem loai san pham (an khoi UI).
+3. Bai 3: tao, sua, tim kiem theo ma/ten/loai/don vi tinh, xoa mem san pham (an khoi UI).
+4. Bai 4: tao, sua, tim kiem theo ma/ten/ghi chu, xoa mem nha cung cap (an khoi UI), ma NCC bat buoc va duy nhat.
+5. Bai 5: tao, sua, tim kiem theo ten/ghi chu, xoa mem kho (an khoi UI).
+6. Reload trang, xac nhan du lieu van ton tai.
+
+Luu y nghiep vu xoa:
+
+- Cac danh muc bai 1-3 dang ap dung `Xoa mem` (khong hard delete mac dinh).
+- Du lieu lich su duoc giu lai qua cot `Is_Active`.
 
 ## 7) Loi thuong gap
 

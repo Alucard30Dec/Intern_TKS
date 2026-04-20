@@ -3,19 +3,19 @@ using System.ComponentModel.DataAnnotations;
 namespace BlazorApp1.Domain.Entities;
 
 /// <summary>
-/// Thuc the loai san pham trong danh muc bai 2.
+/// Thuc the nha cung cap trong danh muc bai 4.
 /// </summary>
-public sealed class LoaiSanPham
+public sealed class NhaCungCap
 {
-    public int Loai_San_Pham_ID { get; set; }
+    public int NCC_ID { get; set; }
 
     [Required]
     [MaxLength(50)]
-    public string Ma_LSP { get; set; } = string.Empty;
+    public string Ma_NCC { get; set; } = string.Empty;
 
     [Required]
-    [MaxLength(120)]
-    public string Ten_LSP { get; set; } = string.Empty;
+    [MaxLength(150)]
+    public string Ten_NCC { get; set; } = string.Empty;
 
     [MaxLength(255)]
     public string? Ghi_Chu { get; set; }

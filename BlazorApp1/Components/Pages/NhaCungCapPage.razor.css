@@ -1,4 +1,4 @@
-.category-page {
+.supplier-page {
     --ui-surface: #ffffff;
     --ui-border: #dbe3ee;
     --ui-border-strong: #c9d4e3;
@@ -30,13 +30,13 @@
     margin: 0;
 }
 
-.category-layout {
+.supplier-layout {
     display: grid;
     gap: 1rem;
     grid-template-columns: minmax(0, 1.75fr) minmax(340px, 1fr);
 }
 
-.category-layout--single {
+.supplier-layout--single {
     grid-template-columns: 1fr;
 }
 
@@ -424,7 +424,7 @@
 }
 
 @media (max-width: 1080px) {
-    .category-layout {
+    .supplier-layout {
         grid-template-columns: 1fr;
     }
 

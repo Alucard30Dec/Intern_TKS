@@ -4,6 +4,7 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <UseAppHost>false</UseAppHost>
   </PropertyGroup>
 
   <ItemGroup>
@@ -18,5 +19,12 @@
     </PackageReference>
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.0" />
   </ItemGroup>
+
+  <Target Name="StopRunningProjectHostBeforeBuild"
+          BeforeTargets="CopyFilesToOutputDirectory"
+          Condition="'$(OS)' == 'Windows_NT' and '$(DesignTimeBuild)' != 'true'">
+    <Exec ContinueOnError="true"
+          Command="powershell -NoProfile -ExecutionPolicy Bypass -Command &quot;$projectName='BlazorApp1'; Get-Process -Name $projectName -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue; Get-CimInstance Win32_Process -Filter \&quot;Name='dotnet.exe'\&quot; | Where-Object { $_.CommandLine -and ($_.CommandLine -like '*BlazorApp1.dll*' -or (($_.CommandLine -match '\\brun\\b' -or $_.CommandLine -match '\\bwatch\\b') -and $_.CommandLine -like '*BlazorApp1*')) } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }&quot;" />
+  </Target>
 
 </Project>

@@ -1,4 +1,4 @@
-.category-page {
+.warehouse-page {
     --ui-surface: #ffffff;
     --ui-border: #dbe3ee;
     --ui-border-strong: #c9d4e3;
@@ -8,7 +8,6 @@
     --ui-primary-strong: #0d5f59;
     --ui-accent: #0f4c81;
     --ui-danger: #b4233f;
-    --ui-warning: #b45309;
     display: grid;
     gap: 1rem;
 }
@@ -30,13 +29,13 @@
     margin: 0;
 }
 
-.category-layout {
+.warehouse-layout {
     display: grid;
     gap: 1rem;
     grid-template-columns: minmax(0, 1.75fr) minmax(340px, 1fr);
 }
 
-.category-layout--single {
+.warehouse-layout--single {
     grid-template-columns: 1fr;
 }
 
@@ -211,17 +210,8 @@
     width: 56px;
 }
 
-.data-table__code {
-    width: 120px;
-}
-
 .data-table__actions {
     width: 156px;
-}
-
-.data-table__code-value {
-    color: #0f4c81;
-    font-weight: 700;
 }
 
 .data-table__name {
@@ -270,10 +260,6 @@
 .form-field:focus-within {
     border-color: #74a7d5;
     box-shadow: 0 0 0 3px rgba(47, 122, 185, 0.12);
-}
-
-.form-field--code {
-    border-left: 4px solid #0f766e;
 }
 
 .form-field--name {
@@ -424,7 +410,7 @@
 }
 
 @media (max-width: 1080px) {
-    .category-layout {
+    .warehouse-layout {
         grid-template-columns: 1fr;
     }
 

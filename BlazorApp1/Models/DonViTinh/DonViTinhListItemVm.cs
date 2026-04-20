@@ -8,4 +8,5 @@ public sealed class DonViTinhListItemVm
     public int Don_Vi_Tinh_ID { get; set; }
     public string Ten_Don_Vi_Tinh { get; set; } = string.Empty;
     public string? Ghi_Chu { get; set; }
+    public bool Is_Active { get; set; }
 }

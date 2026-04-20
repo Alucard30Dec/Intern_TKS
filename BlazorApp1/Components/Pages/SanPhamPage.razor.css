@@ -1,4 +1,4 @@
-.category-page {
+.product-page {
     --ui-surface: #ffffff;
     --ui-border: #dbe3ee;
     --ui-border-strong: #c9d4e3;
@@ -30,13 +30,13 @@
     margin: 0;
 }
 
-.category-layout {
+.product-layout {
     display: grid;
     gap: 1rem;
-    grid-template-columns: minmax(0, 1.75fr) minmax(340px, 1fr);
+    grid-template-columns: minmax(0, 1.95fr) minmax(360px, 1fr);
 }
 
-.category-layout--single {
+.product-layout--single {
     grid-template-columns: 1fr;
 }
 
@@ -215,8 +215,12 @@
     width: 120px;
 }
 
+.data-table__name-col {
+    min-width: 170px;
+}
+
 .data-table__actions {
-    width: 156px;
+    width: 112px;
 }
 
 .data-table__code-value {
@@ -278,6 +282,10 @@
 
 .form-field--name {
     border-left: 4px solid #0f4c81;
+}
+
+.form-field--lookup {
+    border-left: 4px solid #0b7285;
 }
 
 .form-field--note {
@@ -423,13 +431,9 @@
     margin-top: 0.42rem;
 }
 
-@media (max-width: 1080px) {
-    .category-layout {
+@media (max-width: 1180px) {
+    .product-layout {
         grid-template-columns: 1fr;
-    }
-
-    .card--form {
-        max-width: none;
     }
 }
 

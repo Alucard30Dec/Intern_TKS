@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace BlazorApp1.Services;
 
 /// <summary>
-/// Xu ly nghiep vu bai 1: them, sua, xoa danh muc don vi tinh.
+/// Xu ly nghiep vu bai 1: them, sua, xoa mem danh muc don vi tinh.
 /// </summary>
 public sealed class DonViTinhService : IDonViTinhService
 {
@@ -32,12 +32,14 @@ public sealed class DonViTinhService : IDonViTinhService
 
         return await dbContext.DonViTinhs
             .AsNoTracking()
+            .Where(x => x.Is_Active)
             .OrderBy(x => x.Ten_Don_Vi_Tinh)
             .Select(x => new DonViTinhListItemVm
             {
                 Don_Vi_Tinh_ID = x.Don_Vi_Tinh_ID,
                 Ten_Don_Vi_Tinh = x.Ten_Don_Vi_Tinh,
-                Ghi_Chu = x.Ghi_Chu
+                Ghi_Chu = x.Ghi_Chu,
+                Is_Active = x.Is_Active
             })
             .ToListAsync(cancellationToken);
     }
@@ -106,7 +108,8 @@ public sealed class DonViTinhService : IDonViTinhService
             {
                 Ten_Don_Vi_Tinh = normalizedName,
                 // Luu null thay vi chuoi rong de tranh sai lech khi loc/bao cao du lieu "co ghi chu".
-                Ghi_Chu = NormalizeNullableText(model.Ghi_Chu)
+                Ghi_Chu = NormalizeNullableText(model.Ghi_Chu),
+                Is_Active = true
             };
 
             dbContext.DonViTinhs.Add(entity);
@@ -181,7 +184,7 @@ public sealed class DonViTinhService : IDonViTinhService
     }
 
     /// <summary>
-    /// Xoa don vi tinh theo ID.
+    /// Xoa mem don vi tinh theo ID (an khoi UI, van giu du lieu trong DB).
     /// </summary>
     public async Task<ServiceResult> DeleteAsync(int id, CancellationToken cancellationToken = default)
     {
@@ -202,19 +205,24 @@ public sealed class DonViTinhService : IDonViTinhService
                 return ServiceResult.Fail("Không tìm thấy đơn vị tính để xóa.");
             }
 
-            dbContext.DonViTinhs.Remove(entity);
+            if (!entity.Is_Active)
+            {
+                return ServiceResult.Fail("Đơn vị tính này đã được xóa khỏi danh sách hiển thị trước đó.");
+            }
+
+            entity.Is_Active = false;
             await dbContext.SaveChangesAsync(cancellationToken);
-            return ServiceResult.Ok("Xóa đơn vị tính thành công.");
+            return ServiceResult.Ok("Đã xóa khỏi danh sách hiển thị. Dữ liệu vẫn được lưu trong hệ thống.");
         }
         catch (DbUpdateException ex)
         {
-            _logger.LogError(ex, "Delete DonViTinh failed. Don_Vi_Tinh_ID={Don_Vi_Tinh_ID}", id);
-            return ServiceResult.Fail("Không thể xóa đơn vị tính. Dữ liệu có thể đang được sử dụng ở màn hình khác.");
+            _logger.LogError(ex, "Soft delete DonViTinh failed. Don_Vi_Tinh_ID={Don_Vi_Tinh_ID}", id);
+            return ServiceResult.Fail("Không thể xóa khỏi danh sách hiển thị vì dữ liệu đang được ràng buộc ở nghiệp vụ khác.");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error while deleting DonViTinh. Don_Vi_Tinh_ID={Don_Vi_Tinh_ID}", id);
-            return ServiceResult.Fail("Không thể xóa đơn vị tính do lỗi hệ thống.");
+            _logger.LogError(ex, "Unexpected error while soft deleting DonViTinh. Don_Vi_Tinh_ID={Don_Vi_Tinh_ID}", id);
+            return ServiceResult.Fail("Không thể xóa khỏi danh sách hiển thị do lỗi hệ thống.");
         }
     }
 

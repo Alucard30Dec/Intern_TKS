@@ -218,19 +218,34 @@ When the task references `Bai Tap Thuc Tap.docx`, treat document naming as sourc
    - update all references in `Domain`, `Models`, `Services`, and `Components`
    - add migration to align model snapshot
    - run `dotnet ef database update` and verify resulting schema names
-7. For Bai 1 + Bai 2 in this repo, enforce these canonical names:
+7. For Bai 1 + Bai 2 + Bai 3 + Bai 4 in this repo, enforce these canonical names:
    - table `tbl_DM_Don_Vi_Tinh`: `Don_Vi_Tinh_ID`, `Ten_Don_Vi_Tinh`, `Ghi_Chu`
    - table `tbl_DM_Loai_San_Pham`: `Loai_San_Pham_ID`, `Ma_LSP`, `Ten_LSP`, `Ghi_Chu`
+   - table `tbl_DM_San_Pham`: `San_Pham_ID`, `Ma_San_Pham`, `Ten_San_Pham`, `Loai_San_Pham_ID`, `Don_Vi_Tinh_ID`, `Ghi_Chu`
+   - table `tbl_DM_NCC`: `NCC_ID`, `Ma_NCC`, `Ten_NCC`, `Ghi_Chu`
 
 ## Delete Hygiene (Mandatory)
 
-When removing a UI button/feature/flow, always remove related leftovers in the same change set.
+Project override for this repository:
 
-1. Remove UI trigger and related hover/title text (for example `title="...sửa..."`).
-2. Remove related event wiring (for example row `@onclick` that still opens removed flow).
-3. Remove or refactor unused handlers/methods/variables/messages after deletion.
-4. Remove dead CSS selectors/classes tied only to removed elements.
-5. Re-check page behavior to ensure no hidden path still references the removed action.
+1. Keep UI action label as `Xóa` (same UX style as old screens).
+2. `Xóa` on UI must be soft delete only:
+   - remove record from UI list
+   - keep record in DB (`Is_Active = false`)
+   - do not hard delete from UI flow
+3. List/query methods for catalog screens must only load active records (`Is_Active = true`).
+4. Service delete methods must implement: `DeleteAsync(id)` -> set `Is_Active = false`.
+5. Confirmation text must be explicit:
+   - `Xóa <đối tượng> khỏi danh sách hiển thị? Dữ liệu vẫn được lưu trong hệ thống.`
+6. If record was already soft-deleted, return a specific message, not generic failure.
+7. Do not add extra status column/badge unless explicitly requested by user.
+
+Quick check before finishing:
+
+1. UI still uses old layout/wording and has `Xóa` button.
+2. After delete, record disappears from UI.
+3. Deleted record still exists in DB with `Is_Active = false`.
+4. No hard-delete call remains in service/UI path.
 
 ## Definition Of Done
 

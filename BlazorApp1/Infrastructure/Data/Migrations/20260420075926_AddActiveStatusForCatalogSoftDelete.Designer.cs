@@ -2,6 +2,7 @@
 using BlazorApp1.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -10,9 +11,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BlazorApp1.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260420075926_AddActiveStatusForCatalogSoftDelete")]
+    partial class AddActiveStatusForCatalogSoftDelete
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -54,41 +57,6 @@ namespace BlazorApp1.Infrastructure.Data.Migrations
                         .HasDatabaseName("UQ_tbl_DM_Don_Vi_Tinh_Ten_Don_Vi_Tinh");
 
                     b.ToTable("tbl_DM_Don_Vi_Tinh", (string)null);
-                });
-
-            modelBuilder.Entity("BlazorApp1.Domain.Entities.Kho", b =>
-                {
-                    b.Property<int>("Kho_ID")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasColumnName("Kho_ID");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Kho_ID"));
-
-                    b.Property<string>("Ghi_Chu")
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
-                        .HasColumnName("Ghi_Chu");
-
-                    b.Property<bool>("Is_Active")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true)
-                        .HasColumnName("Is_Active");
-
-                    b.Property<string>("Ten_Kho")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("character varying(150)")
-                        .HasColumnName("Ten_Kho");
-
-                    b.HasKey("Kho_ID");
-
-                    b.HasIndex("Ten_Kho")
-                        .IsUnique()
-                        .HasDatabaseName("UQ_tbl_DM_Kho_Ten_Kho");
-
-                    b.ToTable("tbl_DM_Kho", (string)null);
                 });
 
             modelBuilder.Entity("BlazorApp1.Domain.Entities.LoaiSanPham", b =>
@@ -134,51 +102,6 @@ namespace BlazorApp1.Infrastructure.Data.Migrations
                         .HasDatabaseName("UQ_tbl_DM_Loai_San_Pham_Ten_LSP");
 
                     b.ToTable("tbl_DM_Loai_San_Pham", (string)null);
-                });
-
-            modelBuilder.Entity("BlazorApp1.Domain.Entities.NhaCungCap", b =>
-                {
-                    b.Property<int>("NCC_ID")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasColumnName("NCC_ID");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("NCC_ID"));
-
-                    b.Property<string>("Ghi_Chu")
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
-                        .HasColumnName("Ghi_Chu");
-
-                    b.Property<bool>("Is_Active")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true)
-                        .HasColumnName("Is_Active");
-
-                    b.Property<string>("Ma_NCC")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("Ma_NCC");
-
-                    b.Property<string>("Ten_NCC")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("character varying(150)")
-                        .HasColumnName("Ten_NCC");
-
-                    b.HasKey("NCC_ID");
-
-                    b.HasIndex("Ma_NCC")
-                        .IsUnique()
-                        .HasDatabaseName("UQ_tbl_DM_NCC_Ma_NCC");
-
-                    b.HasIndex("Ten_NCC")
-                        .IsUnique()
-                        .HasDatabaseName("UQ_tbl_DM_NCC_Ten_NCC");
-
-                    b.ToTable("tbl_DM_NCC", (string)null);
                 });
 
             modelBuilder.Entity("BlazorApp1.Domain.Entities.SanPham", b =>

@@ -29,7 +29,7 @@ public interface ILoaiSanPhamService
     Task<ServiceResult> UpdateAsync(LoaiSanPhamUpsertVm model, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Xoa loai san pham theo ID.
+    /// Xoa ban ghi khoi danh sach hien thi (soft delete).
     /// </summary>
     Task<ServiceResult> DeleteAsync(int id, CancellationToken cancellationToken = default);
 }

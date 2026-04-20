@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace BlazorApp1.Services;
 
 /// <summary>
-/// Xu ly nghiep vu bai 2: them, sua, xoa danh muc loai san pham.
+/// Xu ly nghiep vu bai 2: them, sua, xoa mem danh muc loai san pham.
 /// </summary>
 public sealed class LoaiSanPhamService : ILoaiSanPhamService
 {
@@ -32,6 +32,7 @@ public sealed class LoaiSanPhamService : ILoaiSanPhamService
 
         return await dbContext.LoaiSanPhams
             .AsNoTracking()
+            .Where(x => x.Is_Active)
             .OrderBy(x => x.Ma_LSP)
             .ThenBy(x => x.Ten_LSP)
             .Select(x => new LoaiSanPhamListItemVm
@@ -39,7 +40,8 @@ public sealed class LoaiSanPhamService : ILoaiSanPhamService
                 Loai_San_Pham_ID = x.Loai_San_Pham_ID,
                 Ma_LSP = x.Ma_LSP,
                 Ten_LSP = x.Ten_LSP,
-                Ghi_Chu = x.Ghi_Chu
+                Ghi_Chu = x.Ghi_Chu,
+                Is_Active = x.Is_Active
             })
             .ToListAsync(cancellationToken);
     }
@@ -117,7 +119,8 @@ public sealed class LoaiSanPhamService : ILoaiSanPhamService
                 Ma_LSP = normalizedCode,
                 Ten_LSP = normalizedName,
                 // Luu null thay vi chuoi rong de tranh sai lech khi thong ke ban ghi "co ghi chu".
-                Ghi_Chu = NormalizeNullableText(model.Ghi_Chu)
+                Ghi_Chu = NormalizeNullableText(model.Ghi_Chu),
+                Is_Active = true
             };
 
             dbContext.LoaiSanPhams.Add(entity);
@@ -200,7 +203,7 @@ public sealed class LoaiSanPhamService : ILoaiSanPhamService
     }
 
     /// <summary>
-    /// Xoa loai san pham theo ID.
+    /// Xoa mem loai san pham theo ID (an khoi UI, van giu du lieu trong DB).
     /// </summary>
     public async Task<ServiceResult> DeleteAsync(int id, CancellationToken cancellationToken = default)
     {
@@ -221,19 +224,24 @@ public sealed class LoaiSanPhamService : ILoaiSanPhamService
                 return ServiceResult.Fail("Không tìm thấy loại sản phẩm để xóa.");
             }
 
-            dbContext.LoaiSanPhams.Remove(entity);
+            if (!entity.Is_Active)
+            {
+                return ServiceResult.Fail("Loại sản phẩm này đã được xóa khỏi danh sách hiển thị trước đó.");
+            }
+
+            entity.Is_Active = false;
             await dbContext.SaveChangesAsync(cancellationToken);
-            return ServiceResult.Ok("Xóa loại sản phẩm thành công.");
+            return ServiceResult.Ok("Đã xóa khỏi danh sách hiển thị. Dữ liệu vẫn được lưu trong hệ thống.");
         }
         catch (DbUpdateException ex)
         {
-            _logger.LogError(ex, "Delete LoaiSanPham failed. Loai_San_Pham_ID={Loai_San_Pham_ID}", id);
-            return ServiceResult.Fail("Không thể xóa loại sản phẩm. Dữ liệu có thể đang được sử dụng ở màn hình khác.");
+            _logger.LogError(ex, "Soft delete LoaiSanPham failed. Loai_San_Pham_ID={Loai_San_Pham_ID}", id);
+            return ServiceResult.Fail("Không thể xóa khỏi danh sách hiển thị vì dữ liệu đang được ràng buộc ở nghiệp vụ khác.");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error while deleting LoaiSanPham. Loai_San_Pham_ID={Loai_San_Pham_ID}", id);
-            return ServiceResult.Fail("Không thể xóa loại sản phẩm do lỗi hệ thống.");
+            _logger.LogError(ex, "Unexpected error while soft deleting LoaiSanPham. Loai_San_Pham_ID={Loai_San_Pham_ID}", id);
+            return ServiceResult.Fail("Không thể xóa khỏi danh sách hiển thị do lỗi hệ thống.");
         }
     }
 
