@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using BlazorApp1.Models.Common;
 
 namespace BlazorApp1.Models.KhoUser;
 
@@ -11,6 +12,7 @@ public sealed class KhoUserUpsertVm
 
     [Required(ErrorMessage = "Mã đăng nhập không được để trống.")]
     [StringLength(100, ErrorMessage = "Mã đăng nhập tối đa 100 ký tự.")]
+    [RegularExpression(BusinessValidationRules.LoginPattern, ErrorMessage = "Mã đăng nhập chỉ gồm chữ in hoa, số và các ký tự . _ @ -.")]
     public string Ma_Dang_Nhap { get; set; } = string.Empty;
 
     [Range(1, int.MaxValue, ErrorMessage = "Kho không được để trống.")]

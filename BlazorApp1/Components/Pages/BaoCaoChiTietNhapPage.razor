@@ -1,0 +1,424 @@
+@page "/bao-cao/chi-tiet-nhap"
+@rendermode InteractiveServer
+@using BlazorApp1.Models.BaoCao
+@using BlazorApp1.Models.Common
+@using BlazorApp1.Services.Interfaces
+@inject IBaoCaoService BaoCaoService
+@inject ILogger<BaoCaoChiTietNhapPage> Logger
+
+<PageTitle>Báo cáo chi tiết hàng nhập</PageTitle>
+
+<section class="report-page">
+    <header class="report-page__header">
+        <h1>Báo cáo chi tiết hàng nhập</h1>
+    </header>
+
+    <section class="report-card report-card--filter">
+
+        <div class="period-switch">
+            @foreach (var option in PeriodOptions)
+            {
+                <button type="button"
+                        class="period-switch__button @(filter.Kieu_Loc == option.Value ? "period-switch__button--active" : null)"
+                        @onclick="() => SelectPeriodAsync(option.Value)"
+                        disabled="@isLoading">
+                    @option.Label
+                </button>
+            }
+        </div>
+
+        <div class="filter-panel">
+            @if (filter.Kieu_Loc == BaoCaoKieuLoc.KhoangNgay)
+            {
+                <div class="filter-grid filter-grid--range">
+                    <label class="filter-field">
+                        <span class="filter-field__label">Từ ngày</span>
+                        <div class="picker-shell picker-shell--date">
+                            <InputDate class="filter-field__input filter-field__input--date"
+                                       @bind-Value="filter.Tu_Ngay"
+                                       @bind-Value:after="SearchAsync" />
+                        </div>
+                    </label>
+                    <label class="filter-field">
+                        <span class="filter-field__label">Đến ngày</span>
+                        <div class="picker-shell picker-shell--date">
+                            <InputDate class="filter-field__input filter-field__input--date"
+                                       @bind-Value="filter.Den_Ngay"
+                                       @bind-Value:after="SearchAsync" />
+                        </div>
+                    </label>
+                </div>
+            }
+            else if (filter.Kieu_Loc == BaoCaoKieuLoc.Thang)
+            {
+                <div class="filter-grid filter-grid--month">
+                    <label class="filter-field">
+                        <span class="filter-field__label">Tháng</span>
+                        <div class="picker-shell picker-shell--select">
+                            <InputSelect class="filter-field__input filter-field__input--select"
+                                         @bind-Value="filter.Thang"
+                                         @bind-Value:after="SearchAsync">
+                                @foreach (var thang in ThangOptions)
+                                {
+                                    <option value="@thang">Tháng @thang</option>
+                                }
+                            </InputSelect>
+                        </div>
+                    </label>
+                    <label class="filter-field">
+                        <span class="filter-field__label">Năm</span>
+                        <div class="picker-shell picker-shell--select">
+                            <InputSelect class="filter-field__input filter-field__input--select"
+                                         @bind-Value="filter.Nam"
+                                         @bind-Value:after="SearchAsync">
+                                @foreach (var nam in NamOptions)
+                                {
+                                    <option value="@nam">@nam</option>
+                                }
+                            </InputSelect>
+                        </div>
+                    </label>
+                </div>
+            }
+            else if (filter.Kieu_Loc == BaoCaoKieuLoc.Quy)
+            {
+                <div class="filter-grid filter-grid--quarter">
+                    <label class="filter-field">
+                        <span class="filter-field__label">Quý</span>
+                        <div class="picker-shell picker-shell--select">
+                            <InputSelect class="filter-field__input filter-field__input--select"
+                                         @bind-Value="filter.Quy"
+                                         @bind-Value:after="SearchAsync">
+                                @foreach (var quy in QuyOptions)
+                                {
+                                    <option value="@quy">Quý @quy</option>
+                                }
+                            </InputSelect>
+                        </div>
+                    </label>
+                    <label class="filter-field">
+                        <span class="filter-field__label">Năm</span>
+                        <div class="picker-shell picker-shell--select">
+                            <InputSelect class="filter-field__input filter-field__input--select"
+                                         @bind-Value="filter.Nam"
+                                         @bind-Value:after="SearchAsync">
+                                @foreach (var nam in NamOptions)
+                                {
+                                    <option value="@nam">@nam</option>
+                                }
+                            </InputSelect>
+                        </div>
+                    </label>
+                </div>
+            }
+            else
+            {
+                <div class="filter-grid filter-grid--year">
+                    <label class="filter-field">
+                        <span class="filter-field__label">Năm</span>
+                        <div class="picker-shell picker-shell--select">
+                            <InputSelect class="filter-field__input filter-field__input--select"
+                                         @bind-Value="filter.Nam"
+                                         @bind-Value:after="SearchAsync">
+                                @foreach (var nam in NamOptions)
+                                {
+                                    <option value="@nam">@nam</option>
+                                }
+                            </InputSelect>
+                        </div>
+                    </label>
+                </div>
+            }
+        </div>
+
+    </section>
+
+    @if (!string.IsNullOrWhiteSpace(pageMessage))
+    {
+        <div class="status-banner @(pageMessageIsError ? "status-banner--error" : "status-banner--success")" role="alert">
+            @pageMessage
+        </div>
+    }
+
+    <section class="metrics-grid">
+        <article class="metric-card">
+            <span>Khoảng áp dụng</span>
+            <strong>@($"{filter.Tu_Ngay:dd/MM/yyyy} - {filter.Den_Ngay:dd/MM/yyyy}")</strong>
+        </article>
+        <article class="metric-card">
+            <span>Tổng SL nhập</span>
+            <strong>@FormatSoLuong(TongSoLuongNhap)</strong>
+        </article>
+        @foreach (var tong in TongTriGiaTheoDonVi)
+        {
+            <article class="metric-card">
+                <span>Tổng trị giá (@tong.Don_Vi_Tien)</span>
+                <strong>@FormatTien(tong.Tong_Tri_Gia, tong.Don_Vi_Tien)</strong>
+            </article>
+        }
+    </section>
+
+    <section class="report-card report-card--grid">
+        <header class="grid-header">
+            <h2>Lưới dữ liệu (@items.Count)</h2>
+        </header>
+
+        @if (isLoading)
+        {
+            <div class="state-box">Đang tải dữ liệu báo cáo...</div>
+        }
+        else if (items.Count == 0)
+        {
+            <div class="state-box state-box--empty">Không có dữ liệu trong kỳ đã chọn.</div>
+        }
+        else
+        {
+            <div class="table-wrap">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th class="data-table__index">STT</th>
+                            <th>Ngày nhập</th>
+                            <th>Số phiếu nhập</th>
+                            <th>NCC</th>
+                            <th>Mã sản phẩm</th>
+                            <th>Tên sản phẩm</th>
+                            <th>Đơn vị tiền</th>
+                            <th class="data-table__number">SL nhập</th>
+                            <th class="data-table__number">Đơn giá</th>
+                            <th class="data-table__number">Trị giá</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (var i = 0; i < items.Count; i++)
+                        {
+                            var item = items[i];
+                            <tr>
+                                <td>@(i + 1)</td>
+                                <td>@item.Ngay_Nhap.ToString("dd/MM/yyyy")</td>
+                                <td>@item.So_Phieu_Nhap</td>
+                                <td>@item.Ten_NCC</td>
+                                <td>@item.Ma_San_Pham</td>
+                                <td>@item.Ten_San_Pham</td>
+                                <td>@NormalizeCurrency(item.Don_Vi_Tien)</td>
+                                <td class="data-table__number">@FormatSoLuong(item.SL_Nhap)</td>
+                                <td class="data-table__number">@FormatTien(item.Don_Gia, item.Don_Vi_Tien)</td>
+                                <td class="data-table__number">@FormatTien(item.Tri_Gia, item.Don_Vi_Tien)</td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="7">Tổng số lượng</td>
+                            <td class="data-table__number">@FormatSoLuong(TongSoLuongNhap)</td>
+                            <td></td>
+                            <td></td>
+                        </tr>
+                        @foreach (var tong in TongTriGiaTheoDonVi)
+                        {
+                            <tr>
+                                <td colspan="9">Tổng trị giá (@tong.Don_Vi_Tien)</td>
+                                <td class="data-table__number">@FormatTien(tong.Tong_Tri_Gia, tong.Don_Vi_Tien)</td>
+                            </tr>
+                        }
+                        @if (TongTriGiaTheoDonVi.Count == 0)
+                        {
+                            <tr>
+                                <td colspan="9">Tổng trị giá</td>
+                                <td class="data-table__number">0</td>
+                            </tr>
+                        }
+                    </tfoot>
+                </table>
+            </div>
+        }
+    </section>
+</section>
+
+@code {
+    private static readonly IReadOnlyList<(BaoCaoKieuLoc Value, string Label)> PeriodOptions =
+    [
+        (BaoCaoKieuLoc.KhoangNgay, "Từ ngày - Đến ngày"),
+        (BaoCaoKieuLoc.Thang, "Theo tháng"),
+        (BaoCaoKieuLoc.Quy, "Theo quý"),
+        (BaoCaoKieuLoc.Nam, "Theo năm")
+    ];
+
+    private static readonly IReadOnlyList<int> ThangOptions = Enumerable.Range(1, 12).ToArray();
+    private static readonly IReadOnlyList<int> QuyOptions = [1, 2, 3, 4];
+    private static readonly IReadOnlyList<int> NamOptions = BuildNamOptions();
+
+    private readonly List<BaoCaoChiTietNhapItemVm> items = [];
+    private BaoCaoDieuKienVm filter = CreateDefaultFilter();
+    private bool isLoading;
+    private string? pageMessage;
+    private bool pageMessageIsError;
+
+    private decimal TongSoLuongNhap => items.Sum(x => x.SL_Nhap);
+    private IReadOnlyList<TongTienTheoDonViVm> TongTriGiaTheoDonVi =>
+        items.GroupBy(x => NormalizeCurrency(x.Don_Vi_Tien))
+            .Select(group => new TongTienTheoDonViVm
+            {
+                Don_Vi_Tien = group.Key,
+                Tong_Tri_Gia = group.Sum(x => x.Tri_Gia)
+            })
+            .OrderBy(x => x.Don_Vi_Tien)
+            .ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await SearchAsync();
+    }
+
+    private async Task SelectPeriodAsync(BaoCaoKieuLoc periodType)
+    {
+        if (filter.Kieu_Loc == periodType)
+        {
+            return;
+        }
+
+        filter.Kieu_Loc = periodType;
+        await SearchAsync();
+    }
+
+    private async Task SearchAsync()
+    {
+        ClearPageMessage();
+        items.Clear();
+
+        if (!TryApplyDateRangeByPeriod())
+        {
+            return;
+        }
+
+        isLoading = true;
+
+        try
+        {
+            var result = await BaoCaoService.GetBaoCaoChiTietNhapAsync(filter);
+            if (!result.Success || result.Data is null)
+            {
+                pageMessage = result.Message;
+                pageMessageIsError = true;
+                return;
+            }
+
+            items.AddRange(result.Data);
+
+            if (items.Count == 0)
+            {
+                pageMessage = "Không có dữ liệu phù hợp trong kỳ đã chọn.";
+                pageMessageIsError = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(
+                ex,
+                "Load report chi tiet nhap failed. TuNgay={TuNgay}, DenNgay={DenNgay}",
+                filter.Tu_Ngay,
+                filter.Den_Ngay);
+            pageMessage = "Không thể tải báo cáo chi tiết hàng nhập do lỗi hệ thống.";
+            pageMessageIsError = true;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private bool TryApplyDateRangeByPeriod()
+    {
+        var nam = Math.Clamp(filter.Nam, BusinessValidationRules.MinReportYear, BusinessValidationRules.MaxReportYear);
+        filter.Nam = nam;
+
+        switch (filter.Kieu_Loc)
+        {
+            case BaoCaoKieuLoc.KhoangNgay:
+                filter.Tu_Ngay = filter.Tu_Ngay.Date;
+                filter.Den_Ngay = filter.Den_Ngay.Date;
+
+                if (filter.Tu_Ngay > filter.Den_Ngay)
+                {
+                    pageMessage = "Khoảng ngày không hợp lệ: Từ ngày phải nhỏ hơn hoặc bằng đến ngày.";
+                    pageMessageIsError = true;
+                    return false;
+                }
+
+                if (filter.Den_Ngay > DateTime.Today)
+                {
+                    pageMessage = $"Khoảng ngày không được lớn hơn ngày hiện tại ({DateTime.Today:dd/MM/yyyy}).";
+                    pageMessageIsError = true;
+                    return false;
+                }
+
+                return true;
+
+            case BaoCaoKieuLoc.Thang:
+                filter.Thang = Math.Clamp(filter.Thang, 1, 12);
+                filter.Tu_Ngay = new DateTime(nam, filter.Thang, 1);
+                filter.Den_Ngay = filter.Tu_Ngay.AddMonths(1).AddDays(-1);
+                return true;
+
+            case BaoCaoKieuLoc.Quy:
+                filter.Quy = Math.Clamp(filter.Quy, 1, 4);
+                var startMonth = ((filter.Quy - 1) * 3) + 1;
+                filter.Tu_Ngay = new DateTime(nam, startMonth, 1);
+                filter.Den_Ngay = filter.Tu_Ngay.AddMonths(3).AddDays(-1);
+                return true;
+
+            case BaoCaoKieuLoc.Nam:
+                filter.Tu_Ngay = new DateTime(nam, 1, 1);
+                filter.Den_Ngay = new DateTime(nam, 12, 31);
+                return true;
+
+            default:
+                pageMessage = "Kiểu lọc thời gian không hợp lệ.";
+                pageMessageIsError = true;
+                return false;
+        }
+    }
+
+    private void ClearPageMessage()
+    {
+        pageMessage = null;
+        pageMessageIsError = false;
+    }
+
+    private static string NormalizeCurrency(string? currency)
+    {
+        return DonViTienOptions.Normalize(currency);
+    }
+
+    private static string FormatSoLuong(decimal value)
+    {
+        return DonViTienOptions.FormatQuantity(value);
+    }
+
+    private static string FormatTien(decimal value, string? donViTien)
+    {
+        return DonViTienOptions.FormatAmount(value, donViTien);
+    }
+
+    private static BaoCaoDieuKienVm CreateDefaultFilter()
+    {
+        return new BaoCaoDieuKienVm
+        {
+            Kieu_Loc = BaoCaoKieuLoc.KhoangNgay,
+            Tu_Ngay = DateTime.Today.AddDays(-30),
+            Den_Ngay = DateTime.Today,
+            Thang = DateTime.Today.Month,
+            Quy = ((DateTime.Today.Month - 1) / 3) + 1,
+            Nam = DateTime.Today.Year
+        };
+    }
+
+    private static IReadOnlyList<int> BuildNamOptions()
+    {
+        var endYear = BusinessValidationRules.MaxReportYear;
+        var startYear = Math.Max(BusinessValidationRules.MinReportYear, DateTime.Today.Year - 9);
+        return Enumerable.Range(startYear, endYear - startYear + 1)
+            .Reverse()
+            .ToArray();
+    }
+}

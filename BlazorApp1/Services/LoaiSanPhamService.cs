@@ -69,6 +69,11 @@ public sealed class LoaiSanPhamService : ILoaiSanPhamService
                 return ServiceResult<LoaiSanPhamUpsertVm>.Fail("Không tìm thấy loại sản phẩm.");
             }
 
+            if (!entity.Is_Active)
+            {
+                return ServiceResult<LoaiSanPhamUpsertVm>.Fail("Loại sản phẩm đã ngưng sử dụng.");
+            }
+
             return ServiceResult<LoaiSanPhamUpsertVm>.Ok(new LoaiSanPhamUpsertVm
             {
                 Loai_San_Pham_ID = entity.Loai_San_Pham_ID,
@@ -170,6 +175,11 @@ public sealed class LoaiSanPhamService : ILoaiSanPhamService
                 return ServiceResult.Fail("Không tìm thấy loại sản phẩm để cập nhật.");
             }
 
+            if (!entity.Is_Active)
+            {
+                return ServiceResult.Fail("Loại sản phẩm đã ngưng sử dụng, không thể cập nhật.");
+            }
+
             var duplicatedCode = await ExistsByCodeAsync(dbContext, normalizedCode, model.Loai_San_Pham_ID, cancellationToken);
             if (duplicatedCode)
             {
@@ -229,9 +239,17 @@ public sealed class LoaiSanPhamService : ILoaiSanPhamService
                 return ServiceResult.Fail("Loại sản phẩm này đã được xóa khỏi danh sách hiển thị trước đó.");
             }
 
+            var hasActiveReference = await dbContext.SanPhams.AnyAsync(
+                x => x.Is_Active && x.Loai_San_Pham_ID == id,
+                cancellationToken);
+            if (hasActiveReference)
+            {
+                return ServiceResult.Fail("Không thể xóa loại sản phẩm vì đang được sử dụng ở danh mục sản phẩm.");
+            }
+
             entity.Is_Active = false;
             await dbContext.SaveChangesAsync(cancellationToken);
-            return ServiceResult.Ok("Đã xóa khỏi danh sách hiển thị. Dữ liệu vẫn được lưu trong hệ thống.");
+            return ServiceResult.Ok("Đã xóa khỏi danh sách.");
         }
         catch (DbUpdateException ex)
         {
@@ -261,6 +279,11 @@ public sealed class LoaiSanPhamService : ILoaiSanPhamService
         if (normalizedCode.Length > 50)
         {
             return ServiceResult.Fail("Mã tối đa 50 ký tự.");
+        }
+
+        if (!BusinessValidationRules.IsValidCode(normalizedCode))
+        {
+            return ServiceResult.Fail("Mã chỉ gồm chữ in hoa, số và các ký tự . _ / -.");
         }
 
         var normalizedName = NormalizeName(model.Ten_LSP);

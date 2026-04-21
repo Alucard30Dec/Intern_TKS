@@ -73,6 +73,11 @@ public sealed class SanPhamService : ISanPhamService
                 return ServiceResult<SanPhamUpsertVm>.Fail("Không tìm thấy sản phẩm.");
             }
 
+            if (!entity.Is_Active)
+            {
+                return ServiceResult<SanPhamUpsertVm>.Fail("Sản phẩm đã ngưng sử dụng.");
+            }
+
             return ServiceResult<SanPhamUpsertVm>.Ok(new SanPhamUpsertVm
             {
                 San_Pham_ID = entity.San_Pham_ID,
@@ -182,6 +187,11 @@ public sealed class SanPhamService : ISanPhamService
                 return ServiceResult.Fail("Không tìm thấy sản phẩm để cập nhật.");
             }
 
+            if (!entity.Is_Active)
+            {
+                return ServiceResult.Fail("Sản phẩm đã ngưng sử dụng, không thể cập nhật.");
+            }
+
             if (!await LoaiSanPhamExistsAsync(dbContext, model.Loai_San_Pham_ID, cancellationToken))
             {
                 return ServiceResult.Fail("Loại sản phẩm không tồn tại.");
@@ -246,9 +256,31 @@ public sealed class SanPhamService : ISanPhamService
                 return ServiceResult.Fail("Sản phẩm này đã được xóa khỏi danh sách hiển thị trước đó.");
             }
 
+            var hasNhapReference = await dbContext.NhapKhoRawDatas.AnyAsync(
+                x => x.Is_Active
+                     && x.San_Pham_ID == id
+                     && x.Nhap_Kho != null
+                     && x.Nhap_Kho.Is_Active,
+                cancellationToken);
+            if (hasNhapReference)
+            {
+                return ServiceResult.Fail("Không thể xóa sản phẩm vì đã phát sinh trong phiếu nhập kho.");
+            }
+
+            var hasXuatReference = await dbContext.XuatKhoRawDatas.AnyAsync(
+                x => x.Is_Active
+                     && x.San_Pham_ID == id
+                     && x.Xuat_Kho != null
+                     && x.Xuat_Kho.Is_Active,
+                cancellationToken);
+            if (hasXuatReference)
+            {
+                return ServiceResult.Fail("Không thể xóa sản phẩm vì đã phát sinh trong phiếu xuất kho.");
+            }
+
             entity.Is_Active = false;
             await dbContext.SaveChangesAsync(cancellationToken);
-            return ServiceResult.Ok("Đã xóa khỏi danh sách hiển thị. Dữ liệu vẫn được lưu trong hệ thống.");
+            return ServiceResult.Ok("Đã xóa khỏi danh sách.");
         }
         catch (DbUpdateException ex)
         {
@@ -278,6 +310,11 @@ public sealed class SanPhamService : ISanPhamService
         if (normalizedCode.Length > 50)
         {
             return ServiceResult.Fail("Mã sản phẩm tối đa 50 ký tự.");
+        }
+
+        if (!BusinessValidationRules.IsValidCode(normalizedCode))
+        {
+            return ServiceResult.Fail("Mã sản phẩm chỉ gồm chữ in hoa, số và các ký tự . _ / -.");
         }
 
         var normalizedName = NormalizeName(model.Ten_San_Pham);

@@ -10,6 +10,7 @@ public sealed class NhapKhoPrintVm
     public DateTime Ngay_Nhap_Kho { get; set; }
     public string Ten_Kho { get; set; } = string.Empty;
     public string Ten_NCC { get; set; } = string.Empty;
+    public string Don_Vi_Tien { get; set; } = BlazorApp1.Models.Common.DonViTienOptions.Vnd;
     public string? Ghi_Chu { get; set; }
     public IReadOnlyList<NhapKhoPrintLineVm> Lines { get; set; } = [];
     public decimal Tong_Tri_Gia => Lines.Sum(x => x.Tri_Gia);
@@ -27,4 +28,3 @@ public sealed class NhapKhoPrintLineVm
     public decimal Don_Gia_Nhap { get; set; }
     public decimal Tri_Gia => SL_Nhap * Don_Gia_Nhap;
 }
-

@@ -413,7 +413,7 @@
 
         var confirmed = await JS.InvokeAsync<bool>(
             "confirm",
-            $"Xóa sản phẩm '{tenSanPham}' khỏi danh sách hiển thị? Dữ liệu vẫn được lưu trong hệ thống.");
+            $"Xóa sản phẩm '{tenSanPham}' khỏi danh sách?");
 
         if (!confirmed)
         {

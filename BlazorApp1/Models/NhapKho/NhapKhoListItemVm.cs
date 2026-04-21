@@ -12,6 +12,7 @@ public sealed class NhapKhoListItemVm
     public int NCC_ID { get; set; }
     public string Ten_NCC { get; set; } = string.Empty;
     public DateTime Ngay_Nhap_Kho { get; set; }
+    public string Don_Vi_Tien { get; set; } = BlazorApp1.Models.Common.DonViTienOptions.Vnd;
     public string? Ghi_Chu { get; set; }
     public int So_Dong_Chi_Tiet { get; set; }
     public decimal Tong_Tri_Gia { get; set; }

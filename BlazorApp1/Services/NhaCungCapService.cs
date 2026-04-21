@@ -69,6 +69,11 @@ public sealed class NhaCungCapService : INhaCungCapService
                 return ServiceResult<NhaCungCapUpsertVm>.Fail("Không tìm thấy nhà cung cấp.");
             }
 
+            if (!entity.Is_Active)
+            {
+                return ServiceResult<NhaCungCapUpsertVm>.Fail("Nhà cung cấp đã ngưng sử dụng.");
+            }
+
             return ServiceResult<NhaCungCapUpsertVm>.Ok(new NhaCungCapUpsertVm
             {
                 NCC_ID = entity.NCC_ID,
@@ -169,6 +174,11 @@ public sealed class NhaCungCapService : INhaCungCapService
                 return ServiceResult.Fail("Không tìm thấy nhà cung cấp để cập nhật.");
             }
 
+            if (!entity.Is_Active)
+            {
+                return ServiceResult.Fail("Nhà cung cấp đã ngưng sử dụng, không thể cập nhật.");
+            }
+
             var duplicatedName = await ExistsByNameAsync(dbContext, normalizedName, model.NCC_ID, cancellationToken);
             if (duplicatedName)
             {
@@ -227,9 +237,17 @@ public sealed class NhaCungCapService : INhaCungCapService
                 return ServiceResult.Fail("Nhà cung cấp này đã được xóa khỏi danh sách hiển thị trước đó.");
             }
 
+            var hasNhapReference = await dbContext.NhapKhos.AnyAsync(
+                x => x.Is_Active && x.NCC_ID == id,
+                cancellationToken);
+            if (hasNhapReference)
+            {
+                return ServiceResult.Fail("Không thể xóa nhà cung cấp vì đã phát sinh trong phiếu nhập kho.");
+            }
+
             entity.Is_Active = false;
             await dbContext.SaveChangesAsync(cancellationToken);
-            return ServiceResult.Ok("Đã xóa khỏi danh sách hiển thị. Dữ liệu vẫn được lưu trong hệ thống.");
+            return ServiceResult.Ok("Đã xóa khỏi danh sách.");
         }
         catch (DbUpdateException ex)
         {
@@ -270,6 +288,11 @@ public sealed class NhaCungCapService : INhaCungCapService
         if (normalizedCode.Length > 50)
         {
             return ServiceResult.Fail("Mã nhà cung cấp tối đa 50 ký tự.");
+        }
+
+        if (!BusinessValidationRules.IsValidCode(normalizedCode))
+        {
+            return ServiceResult.Fail("Mã nhà cung cấp chỉ gồm chữ in hoa, số và các ký tự . _ / -.");
         }
 
         var ghiChu = NormalizeNullableText(model.Ghi_Chu);

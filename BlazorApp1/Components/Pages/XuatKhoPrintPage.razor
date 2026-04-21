@@ -1,0 +1,288 @@
+@page "/xuat-kho/{XuatKhoId:int}/print"
+@page "/xuat-kho/in/{XuatKhoId:int}"
+@using BlazorApp1.Components.Layout
+@layout PrintLayout
+@rendermode InteractiveServer
+@using BlazorApp1.Models.XuatKho
+@using BlazorApp1.Models.Common
+@using BlazorApp1.Services.Interfaces
+@inject IXuatKhoService XuatKhoService
+@inject IJSRuntime JS
+@inject NavigationManager NavigationManager
+@inject ILogger<XuatKhoPrintPage> Logger
+
+<PageTitle>In phiếu xuất kho</PageTitle>
+
+<section class="print-page">
+    <div class="print-toolbar no-print">
+        <button type="button" class="print-button" @onclick="PrintAsync">In phiếu</button>
+        <button type="button" class="print-button print-button--secondary" @onclick="BackToList">Quay lại</button>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="print-state">Đang tải dữ liệu in phiếu xuất...</div>
+    }
+    else if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="print-state print-state--error">@errorMessage</div>
+    }
+    else if (printData is not null)
+    {
+        var tongSoLuong = printData.Lines.Sum(x => x.SL_Xuat);
+
+        <article class="print-sheet">
+            <header class="sheet-header">
+                <div class="sheet-header__left">
+                    <p>Đơn vị : <span class="sheet-line-value">@DisplayOrPlaceholder(printData.Ten_Kho, string.Empty)</span></p>
+                    <p>Bộ phận : <span class="sheet-line-value"></span></p>
+                </div>
+                <div class="sheet-header__center">
+                    <h1 class="sheet-header__title">PHIẾU XUẤT KHO</h1>
+                </div>
+                <div class="sheet-header__right" aria-hidden="true"></div>
+            </header>
+
+            <section class="sheet-info">
+                <p class="sheet-info__date">@FormatDateLong(printData.Ngay_Xuat_Kho)</p>
+
+                <div class="sheet-info__row">
+                    <span class="sheet-info__label">Số Phiếu Xuất:</span>
+                    <span class="sheet-info__value">@DisplayOrPlaceholder(printData.So_Phieu_Xuat_Kho)</span>
+                </div>
+
+                <div class="sheet-info__row">
+                    <span class="sheet-info__label">Đơn vị tiền:</span>
+                    <span class="sheet-info__value">@DonViTien</span>
+                </div>
+
+                <div class="sheet-info__row">
+                    <span class="sheet-info__label">Họ Tên Người Nhận Hàng:</span>
+                    <span class="sheet-info__value"></span>
+                </div>
+
+                <div class="sheet-info__row">
+                    <span class="sheet-info__label">Theo TK Số:</span>
+                    <span class="sheet-info__value"></span>
+                </div>
+
+                <div class="sheet-info__row">
+                    <span class="sheet-info__label">Ghi chú:</span>
+                    <span class="sheet-info__value">@(string.IsNullOrWhiteSpace(printData.Ghi_Chu) ? "Trống" : printData.Ghi_Chu)</span>
+                </div>
+
+                <div class="sheet-info__row sheet-info__row--split">
+                    <div class="sheet-info__cell">
+                        <span class="sheet-info__label">Xuất Tại Kho:</span>
+                        <span class="sheet-info__value">@DisplayOrPlaceholder(printData.Ten_Kho)</span>
+                    </div>
+                    <div class="sheet-info__cell sheet-info__cell--right">
+                        <span class="sheet-info__label">Địa Điểm:</span>
+                        <span class="sheet-info__value"></span>
+                    </div>
+                </div>
+            </section>
+
+            <section class="sheet-table-wrap">
+                <table class="sheet-table">
+                    <colgroup>
+                        <col style="width: 5%" />
+                        <col style="width: 28%" />
+                        <col style="width: 14%" />
+                        <col style="width: 9%" />
+                        <col style="width: 8%" />
+                        <col style="width: 8%" />
+                        <col style="width: 12%" />
+                        <col style="width: 16%" />
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th rowspan="2">STT</th>
+                            <th rowspan="2">Tên nhãn hiệu, quy cách, phẩm chất, vật tư, dụng cụ, sản phẩm, hàng hóa</th>
+                            <th rowspan="2">Mã Hàng</th>
+                            <th rowspan="2">Đơn Vị Tính</th>
+                            <th colspan="2">Số Lượng</th>
+                            <th rowspan="2">Đơn Giá</th>
+                            <th rowspan="2">Thành Tiền</th>
+                        </tr>
+                        <tr>
+                            <th>Kiện</th>
+                            <th>Cái</th>
+                        </tr>
+                        <tr class="sheet-table__index-row">
+                            <th>A</th>
+                            <th>B</th>
+                            <th>C</th>
+                            <th>D</th>
+                            <th>1</th>
+                            <th>2</th>
+                            <th>3</th>
+                            <th>4</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (printData.Lines.Count == 0)
+                        {
+                            <tr>
+                                <td colspan="8" class="sheet-table__empty">Phiếu xuất chưa có dòng chi tiết.</td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @for (var i = 0; i < printData.Lines.Count; i++)
+                            {
+                                var line = printData.Lines[i];
+                                <tr>
+                                    <td>@(i + 1)</td>
+                                    <td>@DisplayOrPlaceholder(line.Ten_San_Pham, "[Chưa có tên hàng]")</td>
+                                    <td>@DisplayOrPlaceholder(line.Ma_San_Pham, "[Chưa có mã]")</td>
+                                    <td>@DisplayOrPlaceholder(line.Ten_Don_Vi_Tinh, "[Chưa có ĐVT]")</td>
+                                    <td class="sheet-table__number"></td>
+                                    <td class="sheet-table__number">@FormatQuantity(line.SL_Xuat)</td>
+                                    <td class="sheet-table__number">@FormatAmount(line.Don_Gia_Xuat, printData.Don_Vi_Tien)</td>
+                                    <td class="sheet-table__number">@FormatAmount(line.Tri_Gia, printData.Don_Vi_Tien)</td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="4" class="sheet-table__total-label">Tổng</td>
+                            <td class="sheet-table__number"></td>
+                            <td class="sheet-table__number">@FormatQuantity(tongSoLuong)</td>
+                            <td></td>
+                            <td class="sheet-table__number">@FormatAmount(printData.Tong_Tri_Gia, printData.Don_Vi_Tien)</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </section>
+
+            <section class="sheet-footer">
+                <p><strong>Tổng Số Tiền (Viết bằng chữ) :</strong> @ConvertMoneyToWords(printData.Tong_Tri_Gia, printData.Don_Vi_Tien)</p>
+                <p><strong>Số Chứng Từ Gốc Kèm Theo:</strong> <span class="sheet-dots sheet-dots--long"></span></p>
+                <p class="sheet-footer__date-line">@FormatSignatureDate(printData.Ngay_Xuat_Kho)</p>
+            </section>
+
+            <footer class="sheet-signature">
+                <div class="sheet-signature__col">
+                    <p>Người Lập Phiếu</p>
+                    <span>(Ký, họ tên)</span>
+                </div>
+                <div class="sheet-signature__col">
+                    <p>Người Nhận Hàng</p>
+                    <span>(Ký, họ tên)</span>
+                </div>
+                <div class="sheet-signature__col">
+                    <p>Thủ Kho</p>
+                    <span>(Ký, họ tên)</span>
+                </div>
+                <div class="sheet-signature__col">
+                    <p>Kế Toán Trưởng</p>
+                    <span>(Ký, họ tên)</span>
+                </div>
+            </footer>
+        </article>
+    }
+</section>
+
+@code {
+    [Parameter]
+    public int XuatKhoId { get; set; }
+
+    private XuatKhoPrintVm? printData;
+    private bool isLoading = true;
+    private string? errorMessage;
+    private string DonViTien => DonViTienOptions.Normalize(printData?.Don_Vi_Tien);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadPrintDataAsync();
+    }
+
+    private async Task LoadPrintDataAsync()
+    {
+        if (XuatKhoId <= 0)
+        {
+            errorMessage = "ID phiếu xuất không hợp lệ.";
+            isLoading = false;
+            return;
+        }
+
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            var result = await XuatKhoService.GetPrintDataAsync(XuatKhoId);
+            if (!result.Success || result.Data is null)
+            {
+                errorMessage = result.Message;
+                printData = null;
+                return;
+            }
+
+            printData = result.Data;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Load print data failed. Xuat_Kho_ID={Xuat_Kho_ID}", XuatKhoId);
+            errorMessage = "Không thể tải dữ liệu in phiếu xuất kho.";
+            printData = null;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task PrintAsync()
+    {
+        await JS.InvokeVoidAsync("print");
+    }
+
+    private void BackToList()
+    {
+        NavigationManager.NavigateTo("/xuat-kho");
+    }
+
+    private static string FormatDateLong(DateTime date)
+    {
+        return PhieuInTextFormatter.FormatDateLong(date);
+    }
+
+    private static string FormatSignatureDate(DateTime date)
+    {
+        return PhieuInTextFormatter.FormatSignatureDate(date);
+    }
+
+    private static string DisplayOrPlaceholder(string? text, string placeholder = ".......................................................")
+    {
+        return PhieuInTextFormatter.DisplayOrPlaceholder(text, placeholder);
+    }
+
+    private static string FormatQuantity(decimal value)
+    {
+        if (value == 0m)
+        {
+            return string.Empty;
+        }
+
+        return DonViTienOptions.FormatQuantity(value);
+    }
+
+    private static string FormatAmount(decimal value, string? donViTien)
+    {
+        if (value == 0m)
+        {
+            return string.Empty;
+        }
+
+        return DonViTienOptions.FormatAmount(value, donViTien);
+    }
+
+    private static string ConvertMoneyToWords(decimal value, string? donViTien)
+    {
+        return PhieuInTextFormatter.ConvertMoneyToWords(value, donViTien);
+    }
+
+}

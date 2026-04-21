@@ -338,7 +338,7 @@
 
         var confirmed = await JS.InvokeAsync<bool>(
             "confirm",
-            $"Xóa nhà cung cấp '{tenNcc}' khỏi danh sách hiển thị? Dữ liệu vẫn được lưu trong hệ thống.");
+            $"Xóa nhà cung cấp '{tenNcc}' khỏi danh sách?");
 
         if (!confirmed)
         {

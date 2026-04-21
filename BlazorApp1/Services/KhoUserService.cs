@@ -69,6 +69,11 @@ public sealed class KhoUserService : IKhoUserService
                 return ServiceResult<KhoUserUpsertVm>.Fail("Không tìm thấy phân quyền kho-user.");
             }
 
+            if (!entity.Is_Active)
+            {
+                return ServiceResult<KhoUserUpsertVm>.Fail("Phân quyền kho-user đã ngưng sử dụng.");
+            }
+
             return ServiceResult<KhoUserUpsertVm>.Ok(new KhoUserUpsertVm
             {
                 Kho_User_ID = entity.Kho_User_ID,
@@ -181,6 +186,11 @@ public sealed class KhoUserService : IKhoUserService
                 return ServiceResult.Fail("Không tìm thấy phân quyền kho-user để cập nhật.");
             }
 
+            if (!entity.Is_Active)
+            {
+                return ServiceResult.Fail("Phân quyền kho-user đã ngưng sử dụng, không thể cập nhật.");
+            }
+
             if (!await KhoExistsAsync(dbContext, model.Kho_ID, cancellationToken))
             {
                 return ServiceResult.Fail("Kho không tồn tại hoặc đã ngưng sử dụng.");
@@ -243,7 +253,7 @@ public sealed class KhoUserService : IKhoUserService
 
             entity.Is_Active = false;
             await dbContext.SaveChangesAsync(cancellationToken);
-            return ServiceResult.Ok("Đã xóa khỏi danh sách hiển thị. Dữ liệu vẫn được lưu trong hệ thống.");
+            return ServiceResult.Ok("Đã xóa khỏi danh sách.");
         }
         catch (DbUpdateException ex)
         {
@@ -273,6 +283,11 @@ public sealed class KhoUserService : IKhoUserService
         if (normalizedLogin.Length > 100)
         {
             return ServiceResult.Fail("Mã đăng nhập tối đa 100 ký tự.");
+        }
+
+        if (!BusinessValidationRules.IsValidLogin(normalizedLogin))
+        {
+            return ServiceResult.Fail("Mã đăng nhập chỉ gồm chữ in hoa, số và các ký tự . _ @ -.");
         }
 
         if (model.Kho_ID <= 0)

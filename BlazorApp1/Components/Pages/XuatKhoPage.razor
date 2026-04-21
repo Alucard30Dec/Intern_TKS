@@ -96,7 +96,7 @@
                                         <td>@item.Ngay_Xuat_Kho.ToString("dd/MM/yyyy")</td>
                                         <td class="data-table__name">@item.Ten_Kho</td>
                                         <td class="data-table__number">@item.So_Dong_Chi_Tiet</td>
-                                        <td class="data-table__number">@item.Tong_Tri_Gia.ToString("N2")</td>
+                                        <td class="data-table__number">@FormatAmountWithCurrency(item.Tong_Tri_Gia, item.Don_Vi_Tien)</td>
                                         <td>
                                             @if (string.IsNullOrWhiteSpace(item.Ghi_Chu))
                                             {
@@ -109,6 +109,12 @@
                                         </td>
                                         <td>
                                             <div class="action-group">
+                                                <button class="app-button app-button--ghost"
+                                                        @onclick="() => OpenPrintFormAsync(item.Xuat_Kho_ID)"
+                                                        @onclick:stopPropagation="true"
+                                                        disabled="@isSaving">
+                                                    In
+                                                </button>
                                                 <button class="app-button app-button--ghost"
                                                         @onclick="() => StartDetailEditorAsync(item)"
                                                         @onclick:stopPropagation="true"
@@ -141,6 +147,7 @@
                     <section class="detail-panel">
                         <header class="detail-panel__header">
                             <h3>Chi tiết phiếu xuất: @selectedSoPhieu</h3>
+                            <span class="card__tag">Đơn vị tiền: @SelectedDonViTien</span>
                         </header>
 
                         @if (isDetailLoading)
@@ -173,16 +180,16 @@
                                                 <td>@(i + 1)</td>
                                                 <td>@detail.Ma_San_Pham</td>
                                                 <td>@detail.Ten_San_Pham</td>
-                                                <td class="detail-table__number">@detail.SL_Xuat.ToString("N2")</td>
-                                                <td class="detail-table__number">@detail.Don_Gia_Xuat.ToString("N2")</td>
-                                                <td class="detail-table__number">@detail.Tri_Gia.ToString("N2")</td>
+                                                <td class="detail-table__number">@FormatQuantity(detail.SL_Xuat)</td>
+                                                <td class="detail-table__number">@FormatAmount(detail.Don_Gia_Xuat, SelectedDonViTien)</td>
+                                                <td class="detail-table__number">@FormatAmountWithCurrency(detail.Tri_Gia, SelectedDonViTien)</td>
                                             </tr>
                                         }
                                     </tbody>
                                     <tfoot>
                                         <tr>
                                             <td colspan="5">Tổng trị giá</td>
-                                            <td class="detail-table__number">@selectedDetails.Sum(x => x.Tri_Gia).ToString("N2")</td>
+                                            <td class="detail-table__number">@FormatAmountWithCurrency(selectedDetails.Sum(x => x.Tri_Gia), SelectedDonViTien)</td>
                                         </tr>
                                     </tfoot>
                                 </table>
@@ -285,9 +292,23 @@
                                     <h3>Chi tiết xuất kho</h3>
                                     @if (!isEditMode)
                                     {
-                                        <button type="button" class="app-button app-button--secondary" @onclick="AddDetailRow" disabled="@isSaving">
-                                            Thêm dòng
-                                        </button>
+                                        <div class="line-section__tools">
+                                            <label class="currency-picker">
+                                                <span class="currency-picker__label">Đơn vị tiền</span>
+                                                <select class="currency-picker__input"
+                                                        value="@formModel.Don_Vi_Tien"
+                                                        @onchange="HandleFormDonViTienChanged"
+                                                        disabled="@isSaving">
+                                                    @foreach (var currency in SupportedCurrencies)
+                                                    {
+                                                        <option value="@currency">@currency</option>
+                                                    }
+                                                </select>
+                                            </label>
+                                            <button type="button" class="app-button app-button--secondary" @onclick="AddDetailRow" disabled="@isSaving">
+                                                Thêm dòng
+                                            </button>
+                                        </div>
                                     }
                                 </header>
 
@@ -301,7 +322,10 @@
                                                 <th class="line-table__number">SL xuất <span class="required-mark">*</span></th>
                                                 <th class="line-table__number">Đơn giá xuất <span class="required-mark">*</span></th>
                                                 <th class="line-table__number">Trị giá</th>
-                                                <th class="line-table__actions">Thao tác</th>
+                                                @if (!isEditMode)
+                                                {
+                                                    <th class="line-table__actions">Thao tác</th>
+                                                }
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -326,45 +350,65 @@
                                                         @GetDonViTinhBySanPhamId(line.San_Pham_ID)
                                                     </td>
                                                     <td>
-                                                        <input class="form-field__input line-input--number"
-                                                               value="@line.SL_Xuat_Text"
-                                                               @oninput="e => line.SL_Xuat_Text = e.Value?.ToString() ?? string.Empty"
-                                                               disabled="@isEditMode"
-                                                               inputmode="decimal"
-                                                               placeholder="Nhập số lượng" />
+                                                        @if (isEditMode)
+                                                        {
+                                                            <span class="line-table__number">@FormatQuantity(GetLineSoLuong(line))</span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <div class="quantity-stepper">
+                                                                <button type="button"
+                                                                        class="quantity-stepper__button"
+                                                                        @onclick="() => DecreaseFormLineQuantity(line)"
+                                                                        disabled="@isSaving">
+                                                                    −
+                                                                </button>
+                                                                <input class="quantity-stepper__input"
+                                                                       value="@line.SL_Xuat_Text"
+                                                                       @oninput="e => line.SL_Xuat_Text = KeepDigitsOnly(e.Value?.ToString())"
+                                                                       inputmode="numeric"
+                                                                       placeholder="0" />
+                                                                <button type="button"
+                                                                        class="quantity-stepper__button"
+                                                                        @onclick="() => IncreaseFormLineQuantity(line)"
+                                                                        disabled="@isSaving">
+                                                                    +
+                                                                </button>
+                                                            </div>
+                                                        }
                                                     </td>
                                                     <td>
                                                         <input class="form-field__input line-input--number"
                                                                value="@line.Don_Gia_Xuat_Text"
                                                                @oninput="e => line.Don_Gia_Xuat_Text = e.Value?.ToString() ?? string.Empty"
+                                                               @onblur="() => NormalizeFormLineDonGiaText(line)"
                                                                disabled="@isEditMode"
                                                                inputmode="decimal"
                                                                placeholder="Nhập đơn giá" />
                                                     </td>
-                                                    <td class="line-table__number">@GetLineTriGia(line).ToString("N2")</td>
-                                                    <td>
-                                                        @if (!isEditMode)
-                                                        {
+                                                    <td class="line-table__number">@FormatAmountWithCurrency(GetLineTriGia(line), formModel.Don_Vi_Tien)</td>
+                                                    @if (!isEditMode)
+                                                    {
+                                                        <td>
                                                             <button type="button"
                                                                     class="app-button app-button--danger"
                                                                     @onclick="() => RemoveDetailRow(index)"
                                                                     disabled="@isSaving">
                                                                 Xóa dòng
                                                             </button>
-                                                        }
-                                                        else
-                                                        {
-                                                            <span class="data-table__muted">—</span>
-                                                        }
-                                                    </td>
+                                                        </td>
+                                                    }
                                                 </tr>
                                             }
                                         </tbody>
                                         <tfoot>
                                             <tr>
                                                 <td colspan="5">Tổng trị giá</td>
-                                                <td class="line-table__number">@formModel.Chi_Tiets.Sum(GetLineTriGia).ToString("N2")</td>
-                                                <td></td>
+                                                <td class="line-table__number">@FormatAmountWithCurrency(formModel.Chi_Tiets.Sum(GetLineTriGia), formModel.Don_Vi_Tien)</td>
+                                                @if (!isEditMode)
+                                                {
+                                                    <td></td>
+                                                }
                                             </tr>
                                         </tfoot>
                                     </table>
@@ -443,12 +487,29 @@
                         <section class="line-section">
                             <header class="line-section__header">
                                 <h3>Lưới hiệu chỉnh chi tiết</h3>
-                                <button type="button"
-                                        class="app-button app-button--secondary"
-                                        @onclick="AddDetailEditorRow"
-                                        disabled="@isDetailLineSaving">
-                                    Thêm dòng
-                                </button>
+                                <div class="line-section__tools">
+                                    @if (!IsDetailEditorInEditMode)
+                                    {
+                                        <label class="currency-picker">
+                                            <span class="currency-picker__label">Đơn vị tiền</span>
+                                            <select class="currency-picker__input"
+                                                    value="@CurrentDetailEditorDonViTien"
+                                                    @onchange="HandleDetailEditorDonViTienChanged"
+                                                    disabled="@isDetailLineSaving">
+                                                @foreach (var currency in SupportedCurrencies)
+                                                {
+                                                    <option value="@currency">@currency</option>
+                                                }
+                                            </select>
+                                        </label>
+                                    }
+                                    <button type="button"
+                                            class="app-button app-button--secondary"
+                                            @onclick="AddDetailEditorRow"
+                                            disabled="@isDetailLineSaving">
+                                        Thêm dòng
+                                    </button>
+                                </div>
                             </header>
 
                             <div class="table-wrap">
@@ -510,15 +571,29 @@
                                                     <td>
                                                         @if (line.IsEditing)
                                                         {
-                                                            <input class="form-field__input line-input--number"
-                                                                   value="@line.SL_Xuat_Text"
-                                                                   @oninput="e => line.SL_Xuat_Text = e.Value?.ToString() ?? string.Empty"
-                                                                   inputmode="decimal"
-                                                                   placeholder="Nhập số lượng" />
+                                                            <div class="quantity-stepper">
+                                                                <button type="button"
+                                                                        class="quantity-stepper__button"
+                                                                        @onclick="() => DecreaseDetailLineQuantity(line)"
+                                                                        disabled="@isDetailLineSaving">
+                                                                    −
+                                                                </button>
+                                                                <input class="quantity-stepper__input"
+                                                                       value="@line.SL_Xuat_Text"
+                                                                       @oninput="e => line.SL_Xuat_Text = KeepDigitsOnly(e.Value?.ToString())"
+                                                                       inputmode="numeric"
+                                                                       placeholder="0" />
+                                                                <button type="button"
+                                                                        class="quantity-stepper__button"
+                                                                        @onclick="() => IncreaseDetailLineQuantity(line)"
+                                                                        disabled="@isDetailLineSaving">
+                                                                    +
+                                                                </button>
+                                                            </div>
                                                         }
                                                         else
                                                         {
-                                                            <span class="line-table__number">@line.SL_Xuat.ToString("N2")</span>
+                                                            <span class="line-table__number">@FormatQuantity(line.SL_Xuat)</span>
                                                         }
                                                     </td>
                                                     <td>
@@ -527,15 +602,16 @@
                                                             <input class="form-field__input line-input--number"
                                                                    value="@line.Don_Gia_Xuat_Text"
                                                                    @oninput="e => line.Don_Gia_Xuat_Text = e.Value?.ToString() ?? string.Empty"
+                                                                   @onblur="() => NormalizeDetailLineDonGiaText(line)"
                                                                    inputmode="decimal"
                                                                    placeholder="Nhập đơn giá" />
                                                         }
                                                         else
                                                         {
-                                                            <span class="line-table__number">@line.Don_Gia_Xuat.ToString("N2")</span>
+                                                            <span class="line-table__number">@FormatAmount(line.Don_Gia_Xuat, CurrentDetailEditorDonViTien)</span>
                                                         }
                                                     </td>
-                                                    <td class="line-table__number">@GetDetailLineTriGia(line).ToString("N2")</td>
+                                                    <td class="line-table__number">@FormatAmountWithCurrency(GetDetailLineTriGia(line), CurrentDetailEditorDonViTien)</td>
                                                     <td>
                                                         <div class="action-group">
                                                             @if (line.IsEditing)
@@ -577,7 +653,7 @@
                                     <tfoot>
                                         <tr>
                                             <td colspan="5">Tổng trị giá</td>
-                                            <td class="line-table__number">@detailEditorLines.Sum(GetDetailLineTriGia).ToString("N2")</td>
+                                            <td class="line-table__number">@FormatAmountWithCurrency(detailEditorLines.Sum(GetDetailLineTriGia), CurrentDetailEditorDonViTien)</td>
                                             <td></td>
                                         </tr>
                                     </tfoot>
@@ -618,6 +694,11 @@
     private bool detailEditorMessageIsError;
     private string searchKeyword = string.Empty;
     private string ngayXuatKhoText = string.Empty;
+    private IReadOnlyList<string> SupportedCurrencies => DonViTienOptions.SupportedValues;
+    private string CurrentDetailEditorDonViTien => DonViTienOptions.Normalize(detailHeaderItem?.Don_Vi_Tien);
+    private string SelectedDonViTien =>
+        items.FirstOrDefault(x => x.Xuat_Kho_ID == selectedXuatKhoId)?.Don_Vi_Tien ?? DonViTienOptions.Vnd;
+    private bool IsDetailEditorInEditMode => detailEditorLines.Any(x => x.IsEditing);
 
     private bool IsFormVisible => isCreateFormVisible;
     private bool HasRequiredLookupData => khoOptions.Count > 0 && sanPhamOptions.Count > 0;
@@ -744,8 +825,10 @@
         formModel = new XuatKhoCreateVm
         {
             Xuat_Kho_ID = 0,
-            Ngay_Xuat_Kho = DateTime.Today
+            Ngay_Xuat_Kho = DateTime.Today,
+            Don_Vi_Tien = DonViTienOptions.Vnd
         };
+        ReformatFormLineValues();
         ngayXuatKhoText = formModel.Ngay_Xuat_Kho.ToString("dd/MM/yyyy");
     }
 
@@ -776,14 +859,15 @@
                 return;
             }
 
+            var donViTien = DonViTienOptions.Normalize(item.Don_Vi_Tien);
             var detailRows = detailResult.Data
                 .Select(x => new XuatKhoRawDataUpsertVm
                 {
                     San_Pham_ID = x.San_Pham_ID,
                     SL_Xuat = x.SL_Xuat,
                     Don_Gia_Xuat = x.Don_Gia_Xuat,
-                    SL_Xuat_Text = FormatDecimalForInput(x.SL_Xuat),
-                    Don_Gia_Xuat_Text = FormatDecimalForInput(x.Don_Gia_Xuat)
+                    SL_Xuat_Text = FormatQuantityForInput(x.SL_Xuat),
+                    Don_Gia_Xuat_Text = FormatAmountInput(x.Don_Gia_Xuat, donViTien)
                 })
                 .ToList();
 
@@ -793,9 +877,12 @@
                 So_Phieu_Xuat_Kho = item.So_Phieu_Xuat_Kho,
                 Kho_ID = item.Kho_ID,
                 Ngay_Xuat_Kho = item.Ngay_Xuat_Kho,
+                Don_Vi_Tien = donViTien,
                 Ghi_Chu = item.Ghi_Chu,
-                Chi_Tiets = detailRows.Count > 0 ? detailRows : [new XuatKhoRawDataUpsertVm()]
+                Chi_Tiets = detailRows
             };
+
+            ReformatFormLineValues();
 
             ngayXuatKhoText = formModel.Ngay_Xuat_Kho.ToString("dd/MM/yyyy");
             isEditMode = true;
@@ -821,10 +908,24 @@
         ClearFormMessage();
         ClearDetailEditorMessage();
 
+        item.Don_Vi_Tien = DonViTienOptions.Normalize(item.Don_Vi_Tien);
         detailHeaderItem = item;
         isDetailEditorVisible = true;
 
         await ReloadDetailEditorLinesAsync();
+    }
+
+    private async Task OpenPrintFormAsync(int xuatKhoId)
+    {
+        if (xuatKhoId <= 0)
+        {
+            pageMessage = "Không thể mở phiếu in vì ID phiếu xuất không hợp lệ.";
+            pageMessageIsError = true;
+            return;
+        }
+
+        var printUrl = $"/xuat-kho/{xuatKhoId}/print";
+        await JS.InvokeVoidAsync("open", printUrl, "_blank");
     }
 
     private async Task ReloadDetailEditorLinesAsync()
@@ -886,7 +987,7 @@
             SL_Xuat = 1m,
             Don_Gia_Xuat = 0m,
             SL_Xuat_Text = "1",
-            Don_Gia_Xuat_Text = string.Empty
+            Don_Gia_Xuat_Text = FormatAmountInput(0m, CurrentDetailEditorDonViTien)
         });
     }
 
@@ -902,8 +1003,8 @@
         }
 
         line.IsEditing = true;
-        line.SL_Xuat_Text = FormatDecimalForInput(line.SL_Xuat);
-        line.Don_Gia_Xuat_Text = FormatDecimalForInput(line.Don_Gia_Xuat);
+        line.SL_Xuat_Text = FormatQuantityForInput(line.SL_Xuat);
+        line.Don_Gia_Xuat_Text = FormatAmountInput(line.Don_Gia_Xuat, CurrentDetailEditorDonViTien);
     }
 
     private void CancelEditDetailLine(XuatKhoDetailEditorLineVm line)
@@ -915,8 +1016,8 @@
         }
 
         line.IsEditing = false;
-        line.SL_Xuat_Text = FormatDecimalForInput(line.SL_Xuat);
-        line.Don_Gia_Xuat_Text = FormatDecimalForInput(line.Don_Gia_Xuat);
+        line.SL_Xuat_Text = FormatQuantityForInput(line.SL_Xuat);
+        line.Don_Gia_Xuat_Text = FormatAmountInput(line.Don_Gia_Xuat, CurrentDetailEditorDonViTien);
         ClearDetailEditorMessage();
     }
 
@@ -929,7 +1030,12 @@
             return;
         }
 
-        if (!TryParseDetailEditorLine(line, out var soLuong, out var donGia, out var validationMessage))
+        if (!TryParseDetailEditorLine(
+                line,
+                CurrentDetailEditorDonViTien,
+                out var soLuong,
+                out var donGia,
+                out var validationMessage))
         {
             detailEditorMessage = validationMessage;
             detailEditorMessageIsError = true;
@@ -1068,7 +1174,41 @@
 
     private void AddDetailRow()
     {
-        formModel.Chi_Tiets.Add(new XuatKhoRawDataUpsertVm());
+        formModel.Chi_Tiets.Add(new XuatKhoRawDataUpsertVm
+        {
+            SL_Xuat = 1m,
+            SL_Xuat_Text = "1",
+            Don_Gia_Xuat = 0m,
+            Don_Gia_Xuat_Text = FormatAmountInput(0m, formModel.Don_Vi_Tien)
+        });
+    }
+
+    private void DecreaseFormLineQuantity(XuatKhoRawDataUpsertVm line)
+    {
+        var current = Math.Max(1m, GetLineSoLuong(line));
+        var next = Math.Max(1m, current - 1m);
+        line.SL_Xuat_Text = FormatQuantityForInput(next);
+    }
+
+    private void IncreaseFormLineQuantity(XuatKhoRawDataUpsertVm line)
+    {
+        var current = Math.Max(0m, GetLineSoLuong(line));
+        var next = Math.Min(BusinessValidationRules.MaxQuantity, current + 1m);
+        line.SL_Xuat_Text = FormatQuantityForInput(next);
+    }
+
+    private void DecreaseDetailLineQuantity(XuatKhoDetailEditorLineVm line)
+    {
+        var current = Math.Max(1m, GetDetailLineSoLuong(line));
+        var next = Math.Max(1m, current - 1m);
+        line.SL_Xuat_Text = FormatQuantityForInput(next);
+    }
+
+    private void IncreaseDetailLineQuantity(XuatKhoDetailEditorLineVm line)
+    {
+        var current = Math.Max(0m, GetDetailLineSoLuong(line));
+        var next = Math.Min(BusinessValidationRules.MaxQuantity, current + 1m);
+        line.SL_Xuat_Text = FormatQuantityForInput(next);
     }
 
     private void RemoveDetailRow(int index)
@@ -1140,6 +1280,13 @@
             return;
         }
 
+        if (!BusinessValidationRules.IsValidVoucherDate(parsedNgayXuatKho))
+        {
+            formMessage = $"Ngày xuất kho phải trong khoảng {BusinessValidationRules.MinVoucherDate:dd/MM/yyyy} đến {BusinessValidationRules.MaxVoucherDate:dd/MM/yyyy}.";
+            formMessageIsError = true;
+            return;
+        }
+
         if (!isEditMode && !TryApplyLineNumericValues(out var lineValidationMessage))
         {
             formMessage = lineValidationMessage;
@@ -1202,7 +1349,7 @@
 
         var confirmed = await JS.InvokeAsync<bool>(
             "confirm",
-            $"Xóa phiếu xuất '{soPhieuXuatKho}' khỏi danh sách hiển thị? Dữ liệu vẫn được lưu trong hệ thống.");
+            $"Xóa phiếu xuất '{soPhieuXuatKho}' khỏi danh sách?");
 
         if (!confirmed)
         {
@@ -1253,6 +1400,71 @@
     private void HandleNgayXuatKhoInput(ChangeEventArgs args)
     {
         ngayXuatKhoText = args.Value?.ToString() ?? string.Empty;
+    }
+
+    private void HandleFormDonViTienChanged(ChangeEventArgs args)
+    {
+        formModel.Don_Vi_Tien = DonViTienOptions.Normalize(args.Value?.ToString());
+        ReformatFormLineValues();
+    }
+
+    private async Task HandleDetailEditorDonViTienChanged(ChangeEventArgs args)
+    {
+        if (detailHeaderItem is null || isDetailLineSaving)
+        {
+            return;
+        }
+
+        var donViTien = DonViTienOptions.Normalize(args.Value?.ToString());
+        if (string.Equals(donViTien, detailHeaderItem.Don_Vi_Tien, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        if (detailEditorLines.Any(x => x.IsEditing))
+        {
+            detailEditorMessage = "Vui lòng lưu hoặc hủy dòng đang chỉnh sửa trước khi đổi đơn vị tiền.";
+            detailEditorMessageIsError = true;
+            return;
+        }
+
+        isDetailLineSaving = true;
+        ClearDetailEditorMessage();
+
+        try
+        {
+            var result = await XuatKhoService.UpdateHeaderAsync(new XuatKhoCreateVm
+            {
+                Xuat_Kho_ID = detailHeaderItem.Xuat_Kho_ID,
+                So_Phieu_Xuat_Kho = detailHeaderItem.So_Phieu_Xuat_Kho,
+                Kho_ID = detailHeaderItem.Kho_ID,
+                Ngay_Xuat_Kho = detailHeaderItem.Ngay_Xuat_Kho,
+                Don_Vi_Tien = donViTien,
+                Ghi_Chu = detailHeaderItem.Ghi_Chu,
+                Chi_Tiets = []
+            });
+
+            detailEditorMessage = result.Message;
+            detailEditorMessageIsError = !result.Success;
+            if (!result.Success)
+            {
+                return;
+            }
+
+            detailHeaderItem.Don_Vi_Tien = donViTien;
+            await LoadDataAsync();
+            await ReloadDetailEditorLinesAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Change currency failed in detail editor. Xuat_Kho_ID={Xuat_Kho_ID}", detailHeaderItem.Xuat_Kho_ID);
+            detailEditorMessage = "Không thể đổi đơn vị tiền do lỗi hệ thống.";
+            detailEditorMessageIsError = true;
+        }
+        finally
+        {
+            isDetailLineSaving = false;
+        }
     }
 
     private void ClearPageMessage()
@@ -1307,29 +1519,65 @@
             var lineNo = i + 1;
             var line = formModel.Chi_Tiets[i];
 
-            if (!TryParsePositiveDecimal(line.SL_Xuat_Text, out var soLuong))
+            if (!TryParsePositiveWholeNumber(line.SL_Xuat_Text, out var soLuong))
             {
-                message = $"Dòng {lineNo}: Số lượng xuất phải là số lớn hơn 0.";
+                message = $"Dòng {lineNo}: Số lượng xuất phải là số nguyên lớn hơn 0.";
                 return false;
             }
 
-            if (!TryParsePositiveDecimal(line.Don_Gia_Xuat_Text, out var donGia))
+            if (soLuong > BusinessValidationRules.MaxQuantity)
+            {
+                message = $"Dòng {lineNo}: Số lượng xuất vượt quá giới hạn cho phép của hệ thống.";
+                return false;
+            }
+
+            if (!TryParsePositiveDecimal(line.Don_Gia_Xuat_Text, formModel.Don_Vi_Tien, out var donGia))
             {
                 message = $"Dòng {lineNo}: Đơn giá xuất phải là số lớn hơn 0.";
                 return false;
             }
 
-            line.SL_Xuat = decimal.Round(soLuong, 2, MidpointRounding.AwayFromZero);
-            line.Don_Gia_Xuat = decimal.Round(donGia, 2, MidpointRounding.AwayFromZero);
+            if (donGia > BusinessValidationRules.MaxAmount)
+            {
+                message = $"Dòng {lineNo}: Đơn giá xuất vượt quá giới hạn cho phép của hệ thống.";
+                return false;
+            }
+
+            if (!BusinessValidationRules.HasValidAmountScale(donGia, formModel.Don_Vi_Tien))
+            {
+                message = $"Dòng {lineNo}: {BuildAmountScaleMessage("Đơn giá xuất", formModel.Don_Vi_Tien)}";
+                return false;
+            }
+
+            line.SL_Xuat = soLuong;
+            line.Don_Gia_Xuat = DonViTienOptions.RoundAmount(donGia, formModel.Don_Vi_Tien);
         }
 
         message = string.Empty;
         return true;
     }
 
-    private static bool TryParsePositiveDecimal(string? text, out decimal parsedValue)
+    private static bool TryParsePositiveWholeNumber(string? text, out decimal parsedValue)
     {
-        if (!TryParseDecimalFlexible(text, out parsedValue))
+        parsedValue = 0m;
+        if (!TryParseDecimalFlexible(text, preferSingleSeparatorAsDecimal: false, out var numericValue))
+        {
+            return false;
+        }
+
+        if (numericValue <= 0 || numericValue != decimal.Truncate(numericValue))
+        {
+            return false;
+        }
+
+        parsedValue = numericValue;
+        return true;
+    }
+
+    private static bool TryParsePositiveDecimal(string? text, string? donViTien, out decimal parsedValue)
+    {
+        var preferSingleSeparatorAsDecimal = DonViTienOptions.UsesDecimalAmount(donViTien);
+        if (!TryParseDecimalFlexible(text, preferSingleSeparatorAsDecimal, out parsedValue))
         {
             return false;
         }
@@ -1337,7 +1585,10 @@
         return parsedValue > 0;
     }
 
-    private static bool TryParseDecimalFlexible(string? text, out decimal parsedValue)
+    private static bool TryParseDecimalFlexible(
+        string? text,
+        bool preferSingleSeparatorAsDecimal,
+        out decimal parsedValue)
     {
         parsedValue = 0m;
         if (string.IsNullOrWhiteSpace(text))
@@ -1363,11 +1614,11 @@
         }
         else if (raw.Contains(','))
         {
-            normalized = NormalizeSingleSeparator(raw, ',');
+            normalized = NormalizeSingleSeparator(raw, ',', preferSingleSeparatorAsDecimal);
         }
         else if (raw.Contains('.'))
         {
-            normalized = NormalizeSingleSeparator(raw, '.');
+            normalized = NormalizeSingleSeparator(raw, '.', preferSingleSeparatorAsDecimal);
         }
         else
         {
@@ -1405,7 +1656,7 @@
             : $"{integerPart}.{fractionPart}";
     }
 
-    private static string NormalizeSingleSeparator(string raw, char separator)
+    private static string NormalizeSingleSeparator(string raw, char separator, bool preferSingleSeparatorAsDecimal)
     {
         var parts = raw.Split(separator, StringSplitOptions.None);
         if (parts.Length == 1)
@@ -1420,6 +1671,11 @@
 
         if (parts.Length == 2)
         {
+            if (preferSingleSeparatorAsDecimal)
+            {
+                return $"{parts[0]}.{parts[1]}";
+            }
+
             return parts[1].Length == 3
                 ? string.Concat(parts[0], parts[1])
                 : $"{parts[0]}.{parts[1]}";
@@ -1433,7 +1689,7 @@
             : $"{integerPart}.{fractionPart}";
     }
 
-    private static XuatKhoDetailEditorLineVm ToDetailEditorLine(XuatKhoDetailListItemVm source)
+    private XuatKhoDetailEditorLineVm ToDetailEditorLine(XuatKhoDetailListItemVm source)
     {
         return new XuatKhoDetailEditorLineVm
         {
@@ -1443,68 +1699,198 @@
             Ten_San_Pham = source.Ten_San_Pham,
             SL_Xuat = source.SL_Xuat,
             Don_Gia_Xuat = source.Don_Gia_Xuat,
-            SL_Xuat_Text = FormatDecimalForInput(source.SL_Xuat),
-            Don_Gia_Xuat_Text = FormatDecimalForInput(source.Don_Gia_Xuat),
+            SL_Xuat_Text = FormatQuantityForInput(source.SL_Xuat),
+            Don_Gia_Xuat_Text = FormatAmountInput(source.Don_Gia_Xuat, CurrentDetailEditorDonViTien),
             IsEditing = false,
             IsNew = false
         };
     }
 
-    private static bool TryParseDetailEditorLine(
+    private bool TryParseDetailEditorLine(
         XuatKhoDetailEditorLineVm line,
+        string donViTien,
         out decimal soLuong,
         out decimal donGia,
         out string message)
     {
-        if (!TryParsePositiveDecimal(line.SL_Xuat_Text, out soLuong))
+        if (!TryParsePositiveWholeNumber(line.SL_Xuat_Text, out soLuong))
         {
-            message = "Số lượng xuất phải là số lớn hơn 0.";
+            message = "Số lượng xuất phải là số nguyên lớn hơn 0.";
             donGia = 0m;
             return false;
         }
 
-        if (!TryParsePositiveDecimal(line.Don_Gia_Xuat_Text, out donGia))
+        if (soLuong > BusinessValidationRules.MaxQuantity)
+        {
+            message = "Số lượng xuất vượt quá giới hạn cho phép của hệ thống.";
+            donGia = 0m;
+            return false;
+        }
+
+        if (!TryParsePositiveDecimal(line.Don_Gia_Xuat_Text, donViTien, out donGia))
         {
             message = "Đơn giá xuất phải là số lớn hơn 0.";
             return false;
         }
 
-        soLuong = decimal.Round(soLuong, 2, MidpointRounding.AwayFromZero);
-        donGia = decimal.Round(donGia, 2, MidpointRounding.AwayFromZero);
+        if (donGia > BusinessValidationRules.MaxAmount)
+        {
+            message = "Đơn giá xuất vượt quá giới hạn cho phép của hệ thống.";
+            return false;
+        }
+
+        if (!BusinessValidationRules.HasValidAmountScale(donGia, donViTien))
+        {
+            message = BuildAmountScaleMessage("Đơn giá xuất", donViTien);
+            return false;
+        }
+
+        donGia = DonViTienOptions.RoundAmount(donGia, donViTien);
         message = string.Empty;
         return true;
     }
 
-    private static decimal GetDetailLineTriGia(XuatKhoDetailEditorLineVm line)
+    private decimal GetDetailLineTriGia(XuatKhoDetailEditorLineVm line)
     {
         if (line.IsEditing)
         {
-            var soLuong = TryParsePositiveDecimal(line.SL_Xuat_Text, out var parsedSoLuong) ? parsedSoLuong : 0m;
-            var donGia = TryParsePositiveDecimal(line.Don_Gia_Xuat_Text, out var parsedDonGia) ? parsedDonGia : 0m;
+            var soLuong = TryParsePositiveWholeNumber(line.SL_Xuat_Text, out var parsedSoLuong) ? parsedSoLuong : 0m;
+            var donGia = TryParsePositiveDecimal(line.Don_Gia_Xuat_Text, CurrentDetailEditorDonViTien, out var parsedDonGia)
+                ? DonViTienOptions.RoundAmount(parsedDonGia, CurrentDetailEditorDonViTien)
+                : 0m;
+            if (!BusinessValidationRules.HasValidAmountScale(donGia, CurrentDetailEditorDonViTien))
+            {
+                return 0m;
+            }
+
             return soLuong * donGia;
         }
 
         return line.SL_Xuat * line.Don_Gia_Xuat;
     }
 
+    private static decimal GetDetailLineSoLuong(XuatKhoDetailEditorLineVm line)
+    {
+        return TryParsePositiveWholeNumber(line.SL_Xuat_Text, out var value) ? value : 0m;
+    }
+
+    private decimal GetDetailLineDonGia(XuatKhoDetailEditorLineVm line)
+    {
+        if (!TryParsePositiveDecimal(line.Don_Gia_Xuat_Text, CurrentDetailEditorDonViTien, out var value))
+        {
+            return 0m;
+        }
+
+        return BusinessValidationRules.HasValidAmountScale(value, CurrentDetailEditorDonViTien) ? value : 0m;
+    }
+
     private static decimal GetLineSoLuong(XuatKhoRawDataUpsertVm line)
     {
-        return TryParsePositiveDecimal(line.SL_Xuat_Text, out var value) ? value : 0m;
+        return TryParsePositiveWholeNumber(line.SL_Xuat_Text, out var value) ? value : 0m;
     }
 
-    private static decimal GetLineDonGia(XuatKhoRawDataUpsertVm line)
+    private decimal GetLineDonGia(XuatKhoRawDataUpsertVm line)
     {
-        return TryParsePositiveDecimal(line.Don_Gia_Xuat_Text, out var value) ? value : 0m;
+        if (!TryParsePositiveDecimal(line.Don_Gia_Xuat_Text, formModel.Don_Vi_Tien, out var value))
+        {
+            return 0m;
+        }
+
+        return BusinessValidationRules.HasValidAmountScale(value, formModel.Don_Vi_Tien) ? value : 0m;
     }
 
-    private static decimal GetLineTriGia(XuatKhoRawDataUpsertVm line)
+    private decimal GetLineTriGia(XuatKhoRawDataUpsertVm line)
     {
-        return GetLineSoLuong(line) * GetLineDonGia(line);
+        var soLuong = GetLineSoLuong(line);
+        var donGia = DonViTienOptions.RoundAmount(GetLineDonGia(line), formModel.Don_Vi_Tien);
+        return soLuong * donGia;
     }
 
-    private static string FormatDecimalForInput(decimal value)
+    private static string FormatQuantityForInput(decimal value)
     {
-        return value.ToString("0.##", CultureInfo.InvariantCulture);
+        return decimal.Round(value, 0, MidpointRounding.AwayFromZero).ToString("0", CultureInfo.InvariantCulture);
+    }
+
+    private static string FormatAmountInput(decimal value, string? donViTien)
+    {
+        return DonViTienOptions.FormatAmountInput(value, donViTien);
+    }
+
+    private static string KeepDigitsOnly(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        return new string(value.Where(char.IsDigit).ToArray());
+    }
+
+    private string FormatAmount(decimal value, string? donViTien)
+    {
+        return DonViTienOptions.FormatAmount(value, donViTien);
+    }
+
+    private string FormatAmountWithCurrency(decimal value, string? donViTien)
+    {
+        var normalized = DonViTienOptions.Normalize(donViTien);
+        return $"{FormatAmount(value, normalized)} {normalized}";
+    }
+
+    private string FormatQuantity(decimal value)
+    {
+        return DonViTienOptions.FormatQuantity(value);
+    }
+
+    private void ReformatFormLineValues()
+    {
+        formModel.Don_Vi_Tien = DonViTienOptions.Normalize(formModel.Don_Vi_Tien);
+        foreach (var line in formModel.Chi_Tiets)
+        {
+            if (TryParsePositiveWholeNumber(line.SL_Xuat_Text, out var soLuong))
+            {
+                line.SL_Xuat_Text = FormatQuantityForInput(soLuong);
+            }
+            else
+            {
+                line.SL_Xuat_Text = FormatQuantityForInput(line.SL_Xuat);
+            }
+
+            if (TryParsePositiveDecimal(line.Don_Gia_Xuat_Text, formModel.Don_Vi_Tien, out var donGia)
+                && BusinessValidationRules.HasValidAmountScale(donGia, formModel.Don_Vi_Tien))
+            {
+                line.Don_Gia_Xuat = DonViTienOptions.RoundAmount(donGia, formModel.Don_Vi_Tien);
+            }
+
+            line.Don_Gia_Xuat_Text = FormatAmountInput(line.Don_Gia_Xuat, formModel.Don_Vi_Tien);
+        }
+    }
+
+    private void NormalizeFormLineDonGiaText(XuatKhoRawDataUpsertVm line)
+    {
+        if (TryParsePositiveDecimal(line.Don_Gia_Xuat_Text, formModel.Don_Vi_Tien, out var value)
+            && BusinessValidationRules.HasValidAmountScale(value, formModel.Don_Vi_Tien))
+        {
+            line.Don_Gia_Xuat = DonViTienOptions.RoundAmount(value, formModel.Don_Vi_Tien);
+            line.Don_Gia_Xuat_Text = FormatAmountInput(line.Don_Gia_Xuat, formModel.Don_Vi_Tien);
+        }
+    }
+
+    private void NormalizeDetailLineDonGiaText(XuatKhoDetailEditorLineVm line)
+    {
+        if (TryParsePositiveDecimal(line.Don_Gia_Xuat_Text, CurrentDetailEditorDonViTien, out var value)
+            && BusinessValidationRules.HasValidAmountScale(value, CurrentDetailEditorDonViTien))
+        {
+            line.Don_Gia_Xuat = DonViTienOptions.RoundAmount(value, CurrentDetailEditorDonViTien);
+            line.Don_Gia_Xuat_Text = FormatAmountInput(line.Don_Gia_Xuat, CurrentDetailEditorDonViTien);
+        }
+    }
+
+    private static string BuildAmountScaleMessage(string fieldLabel, string? donViTien)
+    {
+        return DonViTienOptions.UsesDecimalAmount(donViTien)
+            ? $"{fieldLabel} tối đa 2 chữ số thập phân khi đơn vị tiền là USD."
+            : $"{fieldLabel} không được có phần thập phân khi đơn vị tiền là VND.";
     }
 
     private string GetDonViTinhBySanPhamId(int sanPhamId)

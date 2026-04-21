@@ -67,6 +67,11 @@ public sealed class DonViTinhService : IDonViTinhService
                 return ServiceResult<DonViTinhUpsertVm>.Fail("Không tìm thấy đơn vị tính.");
             }
 
+            if (!entity.Is_Active)
+            {
+                return ServiceResult<DonViTinhUpsertVm>.Fail("Đơn vị tính đã ngưng sử dụng.");
+            }
+
             return ServiceResult<DonViTinhUpsertVm>.Ok(new DonViTinhUpsertVm
             {
                 Don_Vi_Tinh_ID = entity.Don_Vi_Tinh_ID,
@@ -158,6 +163,11 @@ public sealed class DonViTinhService : IDonViTinhService
                 return ServiceResult.Fail("Không tìm thấy đơn vị tính để cập nhật.");
             }
 
+            if (!entity.Is_Active)
+            {
+                return ServiceResult.Fail("Đơn vị tính đã ngưng sử dụng, không thể cập nhật.");
+            }
+
             var duplicated = await ExistsByNameAsync(dbContext, normalizedName, model.Don_Vi_Tinh_ID, cancellationToken);
             if (duplicated)
             {
@@ -210,9 +220,17 @@ public sealed class DonViTinhService : IDonViTinhService
                 return ServiceResult.Fail("Đơn vị tính này đã được xóa khỏi danh sách hiển thị trước đó.");
             }
 
+            var hasActiveReference = await dbContext.SanPhams.AnyAsync(
+                x => x.Is_Active && x.Don_Vi_Tinh_ID == id,
+                cancellationToken);
+            if (hasActiveReference)
+            {
+                return ServiceResult.Fail("Không thể xóa đơn vị tính vì đang được sử dụng ở danh mục sản phẩm.");
+            }
+
             entity.Is_Active = false;
             await dbContext.SaveChangesAsync(cancellationToken);
-            return ServiceResult.Ok("Đã xóa khỏi danh sách hiển thị. Dữ liệu vẫn được lưu trong hệ thống.");
+            return ServiceResult.Ok("Đã xóa khỏi danh sách.");
         }
         catch (DbUpdateException ex)
         {

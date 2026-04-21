@@ -41,6 +41,7 @@ public sealed class Program
         builder.Services.AddScoped<IKhoUserService, KhoUserService>();
         builder.Services.AddScoped<INhapKhoService, NhapKhoService>();
         builder.Services.AddScoped<IXuatKhoService, XuatKhoService>();
+        builder.Services.AddScoped<IBaoCaoService, BaoCaoService>();
 
         var app = builder.Build();
 
@@ -58,14 +59,19 @@ public sealed class Program
             .AddInteractiveServerRenderMode();
 
         var autoMigrate = builder.Configuration.GetValue<bool>("Database:AutoMigrateOnStartup");
-        await InitializeDatabaseAsync(app, autoMigrate);
+        var enableLegacySchemaBootstrap = builder.Configuration.GetValue<bool>(
+            "Database:EnableLegacySchemaBootstrapOnStartup");
+        await InitializeDatabaseAsync(app, autoMigrate, enableLegacySchemaBootstrap);
         await app.RunAsync();
     }
 
     /// <summary>
     /// Ap migration de tao/cap nhat schema khi khoi dong.
     /// </summary>
-    private static async Task InitializeDatabaseAsync(WebApplication app, bool autoMigrate)
+    private static async Task InitializeDatabaseAsync(
+        WebApplication app,
+        bool autoMigrate,
+        bool enableLegacySchemaBootstrap)
     {
         await using var scope = app.Services.CreateAsyncScope();
         var logger = scope.ServiceProvider
@@ -81,7 +87,10 @@ public sealed class Program
                 await dbContext.Database.MigrateAsync();
             }
 
-            await EnsureAssignmentTablesAsync(dbContext);
+            if (enableLegacySchemaBootstrap)
+            {
+                await EnsureAssignmentTablesAsync(dbContext);
+            }
         }
         catch (PostgresException ex) when (ex.SqlState == "28P01")
         {
@@ -93,7 +102,7 @@ public sealed class Program
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Khong the khoi tao co so du lieu cho bai 1 den bai 13.");
+            logger.LogError(ex, "Khong the khoi tao co so du lieu cho bai 1 den bai 17.");
             throw;
         }
     }
@@ -266,12 +275,30 @@ public sealed class Program
                       "Kho_ID" integer NOT NULL,
                       "NCC_ID" integer NOT NULL,
                       "Ngay_Nhap_Kho" date NOT NULL,
+                      "Don_Vi_Tien" varchar(3) NOT NULL DEFAULT 'VND',
                       "Ghi_Chu" varchar(255) NULL,
                       "Is_Active" boolean NOT NULL DEFAULT TRUE
                   );
 
                   ALTER TABLE "tbl_XNK_Nhap_Kho"
                       ADD COLUMN IF NOT EXISTS "Is_Active" boolean NOT NULL DEFAULT TRUE;
+
+                  ALTER TABLE "tbl_XNK_Nhap_Kho"
+                      ADD COLUMN IF NOT EXISTS "Don_Vi_Tien" varchar(3) NOT NULL DEFAULT 'VND';
+
+                  UPDATE "tbl_XNK_Nhap_Kho"
+                  SET "Don_Vi_Tien" = UPPER(BTRIM("Don_Vi_Tien"))
+                  WHERE "Don_Vi_Tien" IS NOT NULL;
+
+                  UPDATE "tbl_XNK_Nhap_Kho"
+                  SET "Don_Vi_Tien" = 'VND'
+                  WHERE "Don_Vi_Tien" IS NULL
+                     OR BTRIM("Don_Vi_Tien") = ''
+                     OR "Don_Vi_Tien" NOT IN ('VND', 'USD');
+
+                  UPDATE "tbl_XNK_Nhap_Kho"
+                  SET "Ngay_Nhap_Kho" = DATE '2000-01-01'
+                  WHERE "Ngay_Nhap_Kho" < DATE '2000-01-01';
 
                   DO $$
                   BEGIN
@@ -287,6 +314,7 @@ public sealed class Program
                               "Kho_ID",
                               "NCC_ID",
                               "Ngay_Nhap_Kho",
+                              "Don_Vi_Tien",
                               "Ghi_Chu",
                               "Is_Active")
                           SELECT
@@ -295,6 +323,7 @@ public sealed class Program
                               dm."Kho_ID",
                               dm."NCC_ID",
                               dm."Ngay_Nhap_Kho",
+                              'VND',
                               dm."Ghi_Chu",
                               COALESCE(dm."Is_Active", TRUE)
                           FROM "tbl_DM_Nhap_Kho" dm
@@ -417,13 +446,33 @@ public sealed class Program
                               REFERENCES "tbl_DM_NCC" ("NCC_ID")
                               ON DELETE RESTRICT;
                       END IF;
+
+                      IF NOT EXISTS (
+                          SELECT 1
+                          FROM pg_constraint
+                          WHERE conname = 'CK_tbl_XNK_Nhap_Kho_Don_Vi_Tien_Valid'
+                      ) THEN
+                          ALTER TABLE "tbl_XNK_Nhap_Kho"
+                              ADD CONSTRAINT "CK_tbl_XNK_Nhap_Kho_Don_Vi_Tien_Valid"
+                              CHECK ("Don_Vi_Tien" IN ('VND','USD'));
+                      END IF;
+
+                      IF NOT EXISTS (
+                          SELECT 1
+                          FROM pg_constraint
+                          WHERE conname = 'CK_tbl_XNK_Nhap_Kho_Ngay_Nhap_Kho_MinDate'
+                      ) THEN
+                          ALTER TABLE "tbl_XNK_Nhap_Kho"
+                              ADD CONSTRAINT "CK_tbl_XNK_Nhap_Kho_Ngay_Nhap_Kho_MinDate"
+                              CHECK ("Ngay_Nhap_Kho" >= DATE '2000-01-01');
+                      END IF;
                   END $$;
 
                   CREATE TABLE IF NOT EXISTS "tbl_DM_Nhap_Kho_Raw_Data" (
                       "Nhap_Kho_Raw_Data_ID" integer GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
                       "Nhap_Kho_ID" integer NOT NULL,
                       "San_Pham_ID" integer NOT NULL,
-                      "SL_Nhap" numeric(18,2) NOT NULL,
+                      "SL_Nhap" numeric(18,0) NOT NULL,
                       "Don_Gia_Nhap" numeric(18,2) NOT NULL,
                       "Is_Active" boolean NOT NULL DEFAULT TRUE
                   );
@@ -431,11 +480,38 @@ public sealed class Program
                   ALTER TABLE "tbl_DM_Nhap_Kho_Raw_Data"
                       ADD COLUMN IF NOT EXISTS "Is_Active" boolean NOT NULL DEFAULT TRUE;
 
+                  ALTER TABLE "tbl_DM_Nhap_Kho_Raw_Data"
+                      ALTER COLUMN "SL_Nhap" TYPE numeric(18,0) USING ROUND("SL_Nhap", 0);
+
                   CREATE INDEX IF NOT EXISTS "IX_tbl_DM_Nhap_Kho_Raw_Data_Nhap_Kho_ID"
                       ON "tbl_DM_Nhap_Kho_Raw_Data" ("Nhap_Kho_ID");
 
                   CREATE INDEX IF NOT EXISTS "IX_tbl_DM_Nhap_Kho_Raw_Data_San_Pham_ID"
                       ON "tbl_DM_Nhap_Kho_Raw_Data" ("San_Pham_ID");
+
+                  UPDATE "tbl_DM_Nhap_Kho_Raw_Data"
+                  SET "Is_Active" = FALSE
+                  WHERE "Is_Active" = TRUE
+                    AND ("SL_Nhap" <= 0 OR "Don_Gia_Nhap" <= 0);
+
+                  WITH duplicated AS (
+                      SELECT "Nhap_Kho_Raw_Data_ID",
+                             ROW_NUMBER() OVER (
+                                 PARTITION BY "Nhap_Kho_ID", "San_Pham_ID"
+                                 ORDER BY "Nhap_Kho_Raw_Data_ID"
+                             ) AS rn
+                      FROM "tbl_DM_Nhap_Kho_Raw_Data"
+                      WHERE "Is_Active" = TRUE
+                  )
+                  UPDATE "tbl_DM_Nhap_Kho_Raw_Data" d
+                  SET "Is_Active" = FALSE
+                  FROM duplicated x
+                  WHERE d."Nhap_Kho_Raw_Data_ID" = x."Nhap_Kho_Raw_Data_ID"
+                    AND x.rn > 1;
+
+                  CREATE UNIQUE INDEX IF NOT EXISTS "UQ_tbl_DM_Nhap_Kho_Raw_Data_Nhap_Kho_ID_San_Pham_ID_Active"
+                      ON "tbl_DM_Nhap_Kho_Raw_Data" ("Nhap_Kho_ID", "San_Pham_ID", "Is_Active")
+                      WHERE "Is_Active" = TRUE;
 
                   DO $$
                   BEGIN
@@ -471,6 +547,26 @@ public sealed class Program
                               REFERENCES "tbl_DM_San_Pham" ("San_Pham_ID")
                               ON DELETE RESTRICT;
                       END IF;
+
+                      IF NOT EXISTS (
+                          SELECT 1
+                          FROM pg_constraint
+                          WHERE conname = 'CK_tbl_DM_Nhap_Kho_Raw_Data_SL_Nhap_Positive'
+                      ) THEN
+                          ALTER TABLE "tbl_DM_Nhap_Kho_Raw_Data"
+                              ADD CONSTRAINT "CK_tbl_DM_Nhap_Kho_Raw_Data_SL_Nhap_Positive"
+                              CHECK ("SL_Nhap" > 0);
+                      END IF;
+
+                      IF NOT EXISTS (
+                          SELECT 1
+                          FROM pg_constraint
+                          WHERE conname = 'CK_tbl_DM_Nhap_Kho_Raw_Data_Don_Gia_Nhap_Positive'
+                      ) THEN
+                          ALTER TABLE "tbl_DM_Nhap_Kho_Raw_Data"
+                              ADD CONSTRAINT "CK_tbl_DM_Nhap_Kho_Raw_Data_Don_Gia_Nhap_Positive"
+                              CHECK ("Don_Gia_Nhap" > 0);
+                      END IF;
                   END $$;
 
                   CREATE TABLE IF NOT EXISTS "tbl_XNK_Xuat_Kho" (
@@ -478,12 +574,30 @@ public sealed class Program
                       "So_Phieu_Xuat_Kho" varchar(50) NOT NULL,
                       "Kho_ID" integer NOT NULL,
                       "Ngay_Xuat_Kho" date NOT NULL,
+                      "Don_Vi_Tien" varchar(3) NOT NULL DEFAULT 'VND',
                       "Ghi_Chu" varchar(255) NULL,
                       "Is_Active" boolean NOT NULL DEFAULT TRUE
                   );
 
                   ALTER TABLE "tbl_XNK_Xuat_Kho"
                       ADD COLUMN IF NOT EXISTS "Is_Active" boolean NOT NULL DEFAULT TRUE;
+
+                  ALTER TABLE "tbl_XNK_Xuat_Kho"
+                      ADD COLUMN IF NOT EXISTS "Don_Vi_Tien" varchar(3) NOT NULL DEFAULT 'VND';
+
+                  UPDATE "tbl_XNK_Xuat_Kho"
+                  SET "Don_Vi_Tien" = UPPER(BTRIM("Don_Vi_Tien"))
+                  WHERE "Don_Vi_Tien" IS NOT NULL;
+
+                  UPDATE "tbl_XNK_Xuat_Kho"
+                  SET "Don_Vi_Tien" = 'VND'
+                  WHERE "Don_Vi_Tien" IS NULL
+                     OR BTRIM("Don_Vi_Tien") = ''
+                     OR "Don_Vi_Tien" NOT IN ('VND', 'USD');
+
+                  UPDATE "tbl_XNK_Xuat_Kho"
+                  SET "Ngay_Xuat_Kho" = DATE '2000-01-01'
+                  WHERE "Ngay_Xuat_Kho" < DATE '2000-01-01';
 
                   CREATE UNIQUE INDEX IF NOT EXISTS "UQ_tbl_XNK_Xuat_Kho_So_Phieu_Xuat_Kho"
                       ON "tbl_XNK_Xuat_Kho" ("So_Phieu_Xuat_Kho");
@@ -507,13 +621,33 @@ public sealed class Program
                               REFERENCES "tbl_DM_Kho" ("Kho_ID")
                               ON DELETE RESTRICT;
                       END IF;
+
+                      IF NOT EXISTS (
+                          SELECT 1
+                          FROM pg_constraint
+                          WHERE conname = 'CK_tbl_XNK_Xuat_Kho_Don_Vi_Tien_Valid'
+                      ) THEN
+                          ALTER TABLE "tbl_XNK_Xuat_Kho"
+                              ADD CONSTRAINT "CK_tbl_XNK_Xuat_Kho_Don_Vi_Tien_Valid"
+                              CHECK ("Don_Vi_Tien" IN ('VND','USD'));
+                      END IF;
+
+                      IF NOT EXISTS (
+                          SELECT 1
+                          FROM pg_constraint
+                          WHERE conname = 'CK_tbl_XNK_Xuat_Kho_Ngay_Xuat_Kho_MinDate'
+                      ) THEN
+                          ALTER TABLE "tbl_XNK_Xuat_Kho"
+                              ADD CONSTRAINT "CK_tbl_XNK_Xuat_Kho_Ngay_Xuat_Kho_MinDate"
+                              CHECK ("Ngay_Xuat_Kho" >= DATE '2000-01-01');
+                      END IF;
                   END $$;
 
                   CREATE TABLE IF NOT EXISTS "tbl_DM_Xuat_Kho_Raw_Data" (
                       "Xuat_Kho_Raw_Data_ID" integer GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
                       "Xuat_Kho_ID" integer NOT NULL,
                       "San_Pham_ID" integer NOT NULL,
-                      "SL_Xuat" numeric(18,2) NOT NULL,
+                      "SL_Xuat" numeric(18,0) NOT NULL,
                       "Don_Gia_Xuat" numeric(18,2) NOT NULL,
                       "Is_Active" boolean NOT NULL DEFAULT TRUE
                   );
@@ -521,11 +655,38 @@ public sealed class Program
                   ALTER TABLE "tbl_DM_Xuat_Kho_Raw_Data"
                       ADD COLUMN IF NOT EXISTS "Is_Active" boolean NOT NULL DEFAULT TRUE;
 
+                  ALTER TABLE "tbl_DM_Xuat_Kho_Raw_Data"
+                      ALTER COLUMN "SL_Xuat" TYPE numeric(18,0) USING ROUND("SL_Xuat", 0);
+
                   CREATE INDEX IF NOT EXISTS "IX_tbl_DM_Xuat_Kho_Raw_Data_Xuat_Kho_ID"
                       ON "tbl_DM_Xuat_Kho_Raw_Data" ("Xuat_Kho_ID");
 
                   CREATE INDEX IF NOT EXISTS "IX_tbl_DM_Xuat_Kho_Raw_Data_San_Pham_ID"
                       ON "tbl_DM_Xuat_Kho_Raw_Data" ("San_Pham_ID");
+
+                  UPDATE "tbl_DM_Xuat_Kho_Raw_Data"
+                  SET "Is_Active" = FALSE
+                  WHERE "Is_Active" = TRUE
+                    AND ("SL_Xuat" <= 0 OR "Don_Gia_Xuat" <= 0);
+
+                  WITH duplicated AS (
+                      SELECT "Xuat_Kho_Raw_Data_ID",
+                             ROW_NUMBER() OVER (
+                                 PARTITION BY "Xuat_Kho_ID", "San_Pham_ID"
+                                 ORDER BY "Xuat_Kho_Raw_Data_ID"
+                             ) AS rn
+                      FROM "tbl_DM_Xuat_Kho_Raw_Data"
+                      WHERE "Is_Active" = TRUE
+                  )
+                  UPDATE "tbl_DM_Xuat_Kho_Raw_Data" d
+                  SET "Is_Active" = FALSE
+                  FROM duplicated x
+                  WHERE d."Xuat_Kho_Raw_Data_ID" = x."Xuat_Kho_Raw_Data_ID"
+                    AND x.rn > 1;
+
+                  CREATE UNIQUE INDEX IF NOT EXISTS "UQ_tbl_DM_Xuat_Kho_Raw_Data_Xuat_Kho_ID_San_Pham_ID_Active"
+                      ON "tbl_DM_Xuat_Kho_Raw_Data" ("Xuat_Kho_ID", "San_Pham_ID", "Is_Active")
+                      WHERE "Is_Active" = TRUE;
 
                   DO $$
                   BEGIN
@@ -551,6 +712,26 @@ public sealed class Program
                               FOREIGN KEY ("San_Pham_ID")
                               REFERENCES "tbl_DM_San_Pham" ("San_Pham_ID")
                               ON DELETE RESTRICT;
+                      END IF;
+
+                      IF NOT EXISTS (
+                          SELECT 1
+                          FROM pg_constraint
+                          WHERE conname = 'CK_tbl_DM_Xuat_Kho_Raw_Data_SL_Xuat_Positive'
+                      ) THEN
+                          ALTER TABLE "tbl_DM_Xuat_Kho_Raw_Data"
+                              ADD CONSTRAINT "CK_tbl_DM_Xuat_Kho_Raw_Data_SL_Xuat_Positive"
+                              CHECK ("SL_Xuat" > 0);
+                      END IF;
+
+                      IF NOT EXISTS (
+                          SELECT 1
+                          FROM pg_constraint
+                          WHERE conname = 'CK_tbl_DM_Xuat_Kho_Raw_Data_Don_Gia_Xuat_Positive'
+                      ) THEN
+                          ALTER TABLE "tbl_DM_Xuat_Kho_Raw_Data"
+                              ADD CONSTRAINT "CK_tbl_DM_Xuat_Kho_Raw_Data_Don_Gia_Xuat_Positive"
+                              CHECK ("Don_Gia_Xuat" > 0);
                       END IF;
                   END $$;
                   """;

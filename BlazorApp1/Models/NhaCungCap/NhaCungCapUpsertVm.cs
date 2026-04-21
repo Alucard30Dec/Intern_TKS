@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using BlazorApp1.Models.Common;
 
 namespace BlazorApp1.Models.NhaCungCap;
 
@@ -11,6 +12,7 @@ public sealed class NhaCungCapUpsertVm
 
     [Required(ErrorMessage = "Mã nhà cung cấp không được để trống.")]
     [StringLength(50, ErrorMessage = "Mã nhà cung cấp tối đa 50 ký tự.")]
+    [RegularExpression(BusinessValidationRules.CodePattern, ErrorMessage = "Mã nhà cung cấp chỉ gồm chữ in hoa, số và các ký tự . _ / -.")]
     public string Ma_NCC { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "Tên nhà cung cấp không được để trống.")]

@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using BlazorApp1.Models.Common;
 
 namespace BlazorApp1.Models.SanPham;
 
@@ -11,6 +12,7 @@ public sealed class SanPhamUpsertVm
 
     [Required(ErrorMessage = "Mã sản phẩm không được để trống.")]
     [StringLength(50, ErrorMessage = "Mã sản phẩm tối đa 50 ký tự.")]
+    [RegularExpression(BusinessValidationRules.CodePattern, ErrorMessage = "Mã sản phẩm chỉ gồm chữ in hoa, số và các ký tự . _ / -.")]
     public string Ma_San_Pham { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "Tên sản phẩm không được để trống.")]

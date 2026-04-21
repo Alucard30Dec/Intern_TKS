@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 namespace BlazorApp1.Infrastructure.Data;
 
 /// <summary>
-/// DbContext quan ly schema va truy cap du lieu cho bai 1 den bai 13.
+/// DbContext quan ly schema va truy cap du lieu cho bai 1 den bai 17.
 /// </summary>
 public sealed class AppDbContext : DbContext
 {
@@ -300,7 +300,15 @@ public sealed class AppDbContext : DbContext
 
         modelBuilder.Entity<NhapKho>(entity =>
         {
-            entity.ToTable("tbl_XNK_Nhap_Kho");
+            entity.ToTable("tbl_XNK_Nhap_Kho", tableBuilder =>
+            {
+                tableBuilder.HasCheckConstraint(
+                    "CK_tbl_XNK_Nhap_Kho_Don_Vi_Tien_Valid",
+                    "\"Don_Vi_Tien\" IN ('VND','USD')");
+                tableBuilder.HasCheckConstraint(
+                    "CK_tbl_XNK_Nhap_Kho_Ngay_Nhap_Kho_MinDate",
+                    "\"Ngay_Nhap_Kho\" >= DATE '2000-01-01'");
+            });
 
             entity.HasKey(x => x.Nhap_Kho_ID);
 
@@ -323,6 +331,12 @@ public sealed class AppDbContext : DbContext
             entity.Property(x => x.Ngay_Nhap_Kho)
                 .HasColumnName("Ngay_Nhap_Kho")
                 .HasColumnType("date")
+                .IsRequired();
+
+            entity.Property(x => x.Don_Vi_Tien)
+                .HasColumnName("Don_Vi_Tien")
+                .HasMaxLength(3)
+                .HasDefaultValue(Models.Common.DonViTienOptions.Vnd)
                 .IsRequired();
 
             entity.Property(x => x.Ghi_Chu)
@@ -362,7 +376,15 @@ public sealed class AppDbContext : DbContext
 
         modelBuilder.Entity<NhapKhoRawData>(entity =>
         {
-            entity.ToTable("tbl_DM_Nhap_Kho_Raw_Data");
+            entity.ToTable("tbl_DM_Nhap_Kho_Raw_Data", tableBuilder =>
+            {
+                tableBuilder.HasCheckConstraint(
+                    "CK_tbl_DM_Nhap_Kho_Raw_Data_SL_Nhap_Positive",
+                    "\"SL_Nhap\" > 0");
+                tableBuilder.HasCheckConstraint(
+                    "CK_tbl_DM_Nhap_Kho_Raw_Data_Don_Gia_Nhap_Positive",
+                    "\"Don_Gia_Nhap\" > 0");
+            });
 
             entity.HasKey(x => x.Nhap_Kho_Raw_Data_ID);
 
@@ -379,7 +401,7 @@ public sealed class AppDbContext : DbContext
 
             entity.Property(x => x.SL_Nhap)
                 .HasColumnName("SL_Nhap")
-                .HasPrecision(18, 2)
+                .HasPrecision(18, 0)
                 .IsRequired();
 
             entity.Property(x => x.Don_Gia_Nhap)
@@ -398,6 +420,11 @@ public sealed class AppDbContext : DbContext
             entity.HasIndex(x => x.San_Pham_ID)
                 .HasDatabaseName("IX_tbl_DM_Nhap_Kho_Raw_Data_San_Pham_ID");
 
+            entity.HasIndex(x => new { x.Nhap_Kho_ID, x.San_Pham_ID, x.Is_Active })
+                .HasDatabaseName("UQ_tbl_DM_Nhap_Kho_Raw_Data_Nhap_Kho_ID_San_Pham_ID_Active")
+                .HasFilter("\"Is_Active\" = TRUE")
+                .IsUnique();
+
             entity.HasOne(x => x.Nhap_Kho)
                 .WithMany(x => x.Nhap_Kho_Raw_Datas)
                 .HasForeignKey(x => x.Nhap_Kho_ID)
@@ -413,7 +440,15 @@ public sealed class AppDbContext : DbContext
 
         modelBuilder.Entity<XuatKho>(entity =>
         {
-            entity.ToTable("tbl_XNK_Xuat_Kho");
+            entity.ToTable("tbl_XNK_Xuat_Kho", tableBuilder =>
+            {
+                tableBuilder.HasCheckConstraint(
+                    "CK_tbl_XNK_Xuat_Kho_Don_Vi_Tien_Valid",
+                    "\"Don_Vi_Tien\" IN ('VND','USD')");
+                tableBuilder.HasCheckConstraint(
+                    "CK_tbl_XNK_Xuat_Kho_Ngay_Xuat_Kho_MinDate",
+                    "\"Ngay_Xuat_Kho\" >= DATE '2000-01-01'");
+            });
 
             entity.HasKey(x => x.Xuat_Kho_ID);
 
@@ -432,6 +467,12 @@ public sealed class AppDbContext : DbContext
             entity.Property(x => x.Ngay_Xuat_Kho)
                 .HasColumnName("Ngay_Xuat_Kho")
                 .HasColumnType("date")
+                .IsRequired();
+
+            entity.Property(x => x.Don_Vi_Tien)
+                .HasColumnName("Don_Vi_Tien")
+                .HasMaxLength(3)
+                .HasDefaultValue(Models.Common.DonViTienOptions.Vnd)
                 .IsRequired();
 
             entity.Property(x => x.Ghi_Chu)
@@ -462,7 +503,15 @@ public sealed class AppDbContext : DbContext
 
         modelBuilder.Entity<XuatKhoRawData>(entity =>
         {
-            entity.ToTable("tbl_DM_Xuat_Kho_Raw_Data");
+            entity.ToTable("tbl_DM_Xuat_Kho_Raw_Data", tableBuilder =>
+            {
+                tableBuilder.HasCheckConstraint(
+                    "CK_tbl_DM_Xuat_Kho_Raw_Data_SL_Xuat_Positive",
+                    "\"SL_Xuat\" > 0");
+                tableBuilder.HasCheckConstraint(
+                    "CK_tbl_DM_Xuat_Kho_Raw_Data_Don_Gia_Xuat_Positive",
+                    "\"Don_Gia_Xuat\" > 0");
+            });
 
             entity.HasKey(x => x.Xuat_Kho_Raw_Data_ID);
 
@@ -479,7 +528,7 @@ public sealed class AppDbContext : DbContext
 
             entity.Property(x => x.SL_Xuat)
                 .HasColumnName("SL_Xuat")
-                .HasPrecision(18, 2)
+                .HasPrecision(18, 0)
                 .IsRequired();
 
             entity.Property(x => x.Don_Gia_Xuat)
@@ -497,6 +546,11 @@ public sealed class AppDbContext : DbContext
 
             entity.HasIndex(x => x.San_Pham_ID)
                 .HasDatabaseName("IX_tbl_DM_Xuat_Kho_Raw_Data_San_Pham_ID");
+
+            entity.HasIndex(x => new { x.Xuat_Kho_ID, x.San_Pham_ID, x.Is_Active })
+                .HasDatabaseName("UQ_tbl_DM_Xuat_Kho_Raw_Data_Xuat_Kho_ID_San_Pham_ID_Active")
+                .HasFilter("\"Is_Active\" = TRUE")
+                .IsUnique();
 
             entity.HasOne(x => x.Xuat_Kho)
                 .WithMany(x => x.Xuat_Kho_Raw_Datas)

@@ -1,0 +1,450 @@
+.report-page {
+    --report-surface: #ffffff;
+    --report-surface-soft: #f7fbff;
+    --report-surface-muted: #f3f8fd;
+    --report-border: #d9e6f2;
+    --report-border-strong: #c7d7e6;
+    --report-border-focus: #9bbfe3;
+    --report-text: #11284d;
+    --report-muted: #60738a;
+    --report-primary: #2d6fb3;
+    --report-primary-strong: #1d4f86;
+    --report-shadow: 0 10px 28px rgba(37, 76, 120, 0.06);
+    --report-shadow-soft: 0 4px 16px rgba(37, 76, 120, 0.05);
+    color: var(--report-text);
+    display: grid;
+    gap: 1rem;
+}
+
+.report-page__header {
+    background: linear-gradient(135deg, #fbfdff 0%, #eff7ff 100%);
+    border: 1px solid var(--report-border);
+    border-radius: 18px;
+    padding: 1.1rem 1.2rem;
+}
+
+    .report-page__header h1 {
+        font-size: 1.35rem;
+        margin: 0;
+    }
+
+.report-page__header p {
+    color: var(--report-muted);
+    margin: 0.42rem 0 0;
+}
+
+.report-card {
+    background: var(--report-surface);
+    border: 1px solid var(--report-border);
+    border-radius: 18px;
+    box-shadow: var(--report-shadow);
+    padding: 1rem;
+}
+
+.report-card--filter {
+    background: linear-gradient(180deg, #fbfdff 0%, #f5fafe 100%);
+}
+
+.report-card h2 {
+    font-size: 1.06rem;
+    margin: 0 0 0.8rem;
+}
+
+.filter-header {
+    align-items: flex-start;
+    display: flex;
+    gap: 0.75rem;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+}
+
+.filter-header__subtitle {
+    color: var(--report-muted);
+    font-size: 0.9rem;
+    margin: 0.28rem 0 0;
+}
+
+.filter-header__badge {
+    background: #eef7ff;
+    border: 1px solid #d2e5f8;
+    border-radius: 999px;
+    color: var(--report-primary-strong);
+    font-size: 0.76rem;
+    font-weight: 700;
+    padding: 0.3rem 0.68rem;
+    white-space: nowrap;
+}
+
+.period-switch {
+    background: rgba(255, 255, 255, 0.78);
+    border: 1px solid #e2ebf5;
+    border-radius: 18px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    padding: 0.5rem;
+}
+
+.period-switch__button {
+    align-items: center;
+    background: #ffffff;
+    border: 1px solid #d9e4ef;
+    border-radius: 999px;
+    color: #44566e;
+    cursor: pointer;
+    display: inline-flex;
+    font-size: 0.84rem;
+    font-weight: 700;
+    justify-content: center;
+    letter-spacing: 0.01em;
+    min-height: 36px;
+    padding: 0.42rem 0.82rem;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.period-switch__button:hover {
+    background: #f6fbff;
+    border-color: #bfd4ea;
+    box-shadow: 0 8px 18px rgba(82, 128, 177, 0.1);
+    color: var(--report-primary-strong);
+    transform: translateY(-1px);
+}
+
+.period-switch__button--active {
+    background: linear-gradient(135deg, #edf5fd 0%, #dcecff 100%);
+    border-color: #aecaeb;
+    box-shadow: 0 10px 22px rgba(54, 101, 150, 0.14);
+    color: var(--report-primary-strong);
+}
+
+.filter-panel {
+    background: linear-gradient(180deg, #fafdff 0%, #f3f8fd 100%);
+    border: 1px solid #deebf7;
+    border-radius: 32px;
+    margin-top: 0.95rem;
+    padding: 1.05rem;
+}
+
+.picker-shell {
+    position: relative;
+}
+
+.picker-shell::before,
+.picker-shell::after {
+    content: "";
+    pointer-events: none;
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.picker-shell--select::before {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 24 24' fill='none' stroke='%232d6fb3' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 2v4'/%3E%3Cpath d='M16 2v4'/%3E%3Crect x='3' y='4' width='18' height='18' rx='4'/%3E%3Cpath d='M3 10h18'/%3E%3C/svg%3E");
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: 1.2rem 1.2rem;
+    height: 1.35rem;
+    left: 1rem;
+    width: 1.35rem;
+}
+
+.picker-shell--select::after {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%232d6fb3' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: 0.9rem 0.9rem;
+    height: 1rem;
+    right: 0.95rem;
+    width: 1rem;
+}
+
+.picker-shell--date::after {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%232d6fb3' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 2v4'/%3E%3Cpath d='M16 2v4'/%3E%3Crect x='3' y='4' width='18' height='18' rx='4'/%3E%3Cpath d='M3 10h18'/%3E%3C/svg%3E");
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: 1.35rem 1.35rem;
+    height: 1.5rem;
+    right: 1rem;
+    width: 1.5rem;
+}
+
+.filter-grid {
+    display: grid;
+    gap: 0.85rem;
+}
+
+.filter-grid--range,
+.filter-grid--month,
+.filter-grid--quarter {
+    grid-template-columns: repeat(2, minmax(0, 320px));
+}
+
+.filter-grid--range {
+    gap: 0.65rem;
+}
+
+.filter-grid--year {
+    grid-template-columns: minmax(0, 320px);
+}
+
+.filter-field {
+    background: #ffffff;
+    border: 1px solid #d5e2ee;
+    border-radius: 30px;
+    box-shadow: var(--report-shadow-soft);
+    display: grid;
+    gap: 0.62rem;
+    padding: 1rem 1.1rem;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.filter-field:hover {
+    border-color: #bfd2e4;
+}
+
+.filter-field:focus-within {
+    border-color: var(--report-border-focus);
+    box-shadow: 0 12px 26px rgba(77, 116, 156, 0.1);
+    transform: translateY(-1px);
+}
+
+.filter-field__label {
+    color: var(--report-text);
+    font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    font-size: 0.76rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.filter-grid--range .filter-field {
+    border-radius: 20px;
+    gap: 0.38rem;
+    padding: 0.68rem 0.82rem;
+}
+
+.filter-grid--range .filter-field__label {
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+}
+
+::deep .filter-field__input {
+    -webkit-appearance: none;
+    appearance: none;
+    background: #ffffff;
+    border: 1px solid var(--report-border-strong);
+    border-radius: 22px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    box-sizing: border-box;
+    color: var(--report-text);
+    display: block;
+    font: inherit;
+    font-size: 0.96rem;
+    font-weight: 600;
+    line-height: 1.2;
+    min-height: 52px;
+    padding: 0.72rem 1rem;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease, transform 0.15s ease;
+    width: 100%;
+}
+
+::deep .filter-field__input--select {
+    cursor: pointer;
+    font-size: 0.76rem;
+    min-height: 42px;
+    padding: 0.48rem 2.35rem 0.48rem 2.7rem;
+}
+
+::deep .filter-field__input--date {
+    letter-spacing: 0.04em;
+    padding-right: 3.2rem;
+}
+
+::deep .filter-grid--range .filter-field__input--date {
+    font-size: 0.8rem;
+    min-height: 36px;
+    padding: 0.34rem 2.55rem 0.34rem 0.78rem;
+    border-radius: 18px;
+}
+
+::deep .filter-field__input:hover {
+    border-color: #b7cbe0;
+}
+
+::deep .filter-field__input:focus {
+    background: #fcfeff;
+    border-color: var(--report-border-focus);
+    box-shadow: 0 0 0 4px rgba(126, 166, 209, 0.16);
+    outline: none;
+    transform: translateY(-1px);
+}
+
+::deep input.filter-field__input[type="date"] {
+    position: relative;
+}
+
+::deep input.filter-field__input[type="date"]::-webkit-date-and-time-value {
+    text-align: left;
+}
+
+::deep input.filter-field__input[type="date"]::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    height: 2.25rem;
+    inset: 0 0 0 auto;
+    margin-right: 0.65rem;
+    opacity: 0;
+    position: absolute;
+    width: 2.25rem;
+}
+
+.filter-actions {
+    align-items: flex-start;
+    border-top: 1px solid #e2ebf4;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    justify-content: flex-end;
+    margin-top: 0.8rem;
+    padding-top: 0.75rem;
+}
+
+.filter-actions__hint {
+    color: var(--report-muted);
+    font-size: 0.88rem;
+    font-style: italic;
+}
+
+.status-banner {
+    border: 1px solid #bbf7d0;
+    border-radius: 12px;
+    color: #166534;
+    font-size: 0.95rem;
+    font-weight: 600;
+    padding: 0.72rem 0.9rem;
+}
+
+.status-banner--error {
+    background: #fef2f2;
+    border-color: #fecaca;
+    color: #991b1b;
+}
+
+.status-banner--success {
+    background: #f0fdf4;
+}
+
+.metrics-grid {
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.metrics-grid--5 {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.metric-card {
+    background: #ffffff;
+    border: 1px solid #dce6f4;
+    border-radius: 14px;
+    display: grid;
+    gap: 0.24rem;
+    padding: 0.8rem 0.92rem;
+}
+
+.metric-card span {
+    color: #506274;
+    font-size: 0.84rem;
+}
+
+.metric-card strong {
+    color: var(--report-primary-strong);
+    font-size: 1.05rem;
+}
+
+.grid-header h2 {
+    margin: 0;
+}
+
+.state-box {
+    background: #f8fafc;
+    border: 1px dashed #cbd5e1;
+    border-radius: 12px;
+    color: #334155;
+    padding: 0.95rem;
+    text-align: center;
+}
+
+.state-box--empty {
+    color: #475569;
+}
+
+.table-wrap {
+    overflow-x: auto;
+}
+
+.data-table {
+    border-collapse: collapse;
+    min-width: 1020px;
+    width: 100%;
+}
+
+.data-table th,
+.data-table td {
+    border: 1px solid #d7dde7;
+    font-size: 0.92rem;
+    padding: 0.5rem;
+    vertical-align: top;
+}
+
+.data-table thead th {
+    background: #eaf1fb;
+    text-align: left;
+}
+
+.data-table__index {
+    text-align: center;
+    width: 58px;
+}
+
+.data-table__number {
+    text-align: right !important;
+    white-space: nowrap;
+}
+
+.data-table tfoot td {
+    background: #f8fbff;
+    font-weight: 700;
+}
+
+.data-table tfoot td:first-child {
+    text-align: right;
+}
+
+@media (max-width: 980px) {
+    .filter-header {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .filter-grid--range,
+    .filter-grid--month,
+    .filter-grid--quarter,
+    .filter-grid--year {
+        grid-template-columns: 1fr;
+    }
+
+    .filter-field {
+        border-radius: 24px;
+        padding: 0.9rem;
+    }
+
+    ::deep .filter-field__input {
+        min-height: 48px;
+    }
+
+    .metrics-grid,
+    .metrics-grid--5 {
+        grid-template-columns: 1fr;
+    }
+}

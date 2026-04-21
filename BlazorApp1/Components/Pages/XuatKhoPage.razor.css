@@ -297,10 +297,17 @@
     padding: 0.8rem;
 }
 
+.detail-panel__header {
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.55rem;
+}
+
 .detail-panel__header h3 {
     color: #0f172a;
     font-size: 0.95rem;
-    margin: 0 0 0.55rem;
+    margin: 0;
 }
 
 .header-info {
@@ -467,6 +474,44 @@
     margin: 0;
 }
 
+.line-section__tools {
+    align-items: center;
+    display: flex;
+    gap: 0.65rem;
+}
+
+.currency-picker {
+    align-items: center;
+    display: inline-flex;
+    gap: 0.5rem;
+}
+
+.currency-picker__label {
+    color: #475569;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.currency-picker__input {
+    background: #fff;
+    border: 1px solid #c9d4e3;
+    border-radius: 10px;
+    color: #0f172a;
+    font: inherit;
+    font-weight: 700;
+    min-height: 38px;
+    min-width: 105px;
+    padding: 0.45rem 0.65rem;
+}
+
+.currency-picker__input:focus {
+    border-color: #2f7ab9;
+    box-shadow: 0 0 0 3px rgba(47, 122, 185, 0.18);
+    outline: none;
+}
+
 .line-table__index {
     width: 46px;
 }
@@ -489,6 +534,53 @@
 
 .line-input--number {
     text-align: right;
+}
+
+.quantity-stepper {
+    align-items: stretch;
+    border: 1px solid #c9d4e3;
+    border-radius: 18px;
+    display: inline-grid;
+    grid-template-columns: 58px 120px 58px;
+    min-height: 42px;
+    overflow: hidden;
+}
+
+.quantity-stepper__button {
+    background: #f8fafc;
+    border: none;
+    color: #334155;
+    cursor: pointer;
+    font-size: 1.75rem;
+    font-weight: 500;
+    line-height: 1;
+}
+
+.quantity-stepper__button + .quantity-stepper__input,
+.quantity-stepper__input + .quantity-stepper__button {
+    border-left: 1px solid #c9d4e3;
+}
+
+.quantity-stepper__button:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.quantity-stepper__input {
+    appearance: textfield;
+    background: #fff;
+    border: none;
+    color: #0f172a;
+    font: inherit;
+    font-size: 1.05rem;
+    font-weight: 700;
+    padding: 0 0.45rem;
+    text-align: center;
+    width: 100%;
+}
+
+.quantity-stepper__input:focus {
+    outline: none;
 }
 
 .line-editor__row--editing {
@@ -610,6 +702,16 @@
 
     .form-grid {
         grid-template-columns: 1fr;
+    }
+
+    .line-section__header {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .line-section__tools {
+        align-items: stretch;
+        flex-direction: column;
     }
 
     .header-info__grid {

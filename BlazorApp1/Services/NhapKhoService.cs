@@ -4,6 +4,7 @@ using BlazorApp1.Models.Common;
 using BlazorApp1.Models.NhapKho;
 using BlazorApp1.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using System.Data;
 
 namespace BlazorApp1.Services;
 
@@ -44,6 +45,7 @@ public sealed class NhapKhoService : INhapKhoService
                 NCC_ID = x.NCC_ID,
                 Ten_NCC = x.NCC != null ? x.NCC.Ten_NCC : string.Empty,
                 Ngay_Nhap_Kho = x.Ngay_Nhap_Kho,
+                Don_Vi_Tien = x.Don_Vi_Tien,
                 Ghi_Chu = x.Ghi_Chu,
                 So_Dong_Chi_Tiet = x.Nhap_Kho_Raw_Datas.Count(d => d.Is_Active),
                 Tong_Tri_Gia = x.Nhap_Kho_Raw_Datas
@@ -130,6 +132,7 @@ public sealed class NhapKhoService : INhapKhoService
                     Ngay_Nhap_Kho = x.Ngay_Nhap_Kho,
                     Ten_Kho = x.Kho != null ? x.Kho.Ten_Kho : string.Empty,
                     Ten_NCC = x.NCC != null ? x.NCC.Ten_NCC : string.Empty,
+                    Don_Vi_Tien = x.Don_Vi_Tien,
                     Ghi_Chu = x.Ghi_Chu
                 })
                 .FirstOrDefaultAsync(cancellationToken);
@@ -178,8 +181,9 @@ public sealed class NhapKhoService : INhapKhoService
         }
 
         var normalizedSoPhieu = NormalizeCode(model.So_Phieu_Nhap_Kho);
+        var normalizedDonViTien = NormalizeDonViTien(model.Don_Vi_Tien);
         var normalizedGhiChu = NormalizeNullableText(model.Ghi_Chu);
-        var normalizedDetails = NormalizeDetails(model.Chi_Tiets);
+        var normalizedDetails = NormalizeDetails(model.Chi_Tiets, normalizedDonViTien);
 
         try
         {
@@ -222,6 +226,7 @@ public sealed class NhapKhoService : INhapKhoService
                 Kho_ID = model.Kho_ID,
                 NCC_ID = model.NCC_ID,
                 Ngay_Nhap_Kho = model.Ngay_Nhap_Kho.Date,
+                Don_Vi_Tien = normalizedDonViTien,
                 Ghi_Chu = normalizedGhiChu,
                 Is_Active = true,
                 Nhap_Kho_Raw_Datas = normalizedDetails.Select(x => new NhapKhoRawData
@@ -267,13 +272,16 @@ public sealed class NhapKhoService : INhapKhoService
         }
 
         var normalizedSoPhieu = NormalizeCode(model.So_Phieu_Nhap_Kho);
+        var normalizedDonViTien = NormalizeDonViTien(model.Don_Vi_Tien);
         var normalizedGhiChu = NormalizeNullableText(model.Ghi_Chu);
 
         try
         {
             await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
 
             var entity = await dbContext.NhapKhos
+                .Include(x => x.Nhap_Kho_Raw_Datas)
                 .FirstOrDefaultAsync(
                     x => x.Nhap_Kho_ID == model.Nhap_Kho_ID && x.Is_Active,
                     cancellationToken);
@@ -301,13 +309,79 @@ public sealed class NhapKhoService : INhapKhoService
                 return ServiceResult.Fail("Nhà cung cấp không tồn tại hoặc đã ngưng sử dụng.");
             }
 
+            var activeDetails = entity.Nhap_Kho_Raw_Datas
+                .Where(x => x.Is_Active)
+                .ToList();
+
+            var oldNgayNhap = entity.Ngay_Nhap_Kho.Date;
+            var newNgayNhap = model.Ngay_Nhap_Kho.Date;
+            var oldKhoId = entity.Kho_ID;
+            var newKhoId = model.Kho_ID;
+
+            if (activeDetails.Count > 0)
+            {
+                if (oldKhoId != newKhoId)
+                {
+                    var stockValidation = await ValidateNhapMutationStockAsync(
+                        dbContext,
+                        oldKhoId,
+                        activeDetails.Select(x => x.San_Pham_ID).ToList(),
+                        excludeNhapKhoId: entity.Nhap_Kho_ID,
+                        excludeNhapKhoRawDataId: null,
+                        replacementNhapMovements: null,
+                        "Không thể hiệu chỉnh phiếu nhập kho",
+                        cancellationToken);
+                    if (!stockValidation.Success)
+                    {
+                        return stockValidation;
+                    }
+                }
+                else if (oldNgayNhap != newNgayNhap)
+                {
+                    var replacementNhapMovements = activeDetails
+                        .Select(x => new ReplacementNhapMovement(
+                            x.San_Pham_ID,
+                            newNgayNhap,
+                            x.SL_Nhap,
+                            entity.Nhap_Kho_ID,
+                            x.Nhap_Kho_Raw_Data_ID))
+                        .ToList();
+
+                    var stockValidation = await ValidateNhapMutationStockAsync(
+                        dbContext,
+                        oldKhoId,
+                        activeDetails.Select(x => x.San_Pham_ID).ToList(),
+                        excludeNhapKhoId: entity.Nhap_Kho_ID,
+                        excludeNhapKhoRawDataId: null,
+                        replacementNhapMovements,
+                        "Không thể hiệu chỉnh phiếu nhập kho",
+                        cancellationToken);
+                    if (!stockValidation.Success)
+                    {
+                        return stockValidation;
+                    }
+                }
+            }
+
+            var currencyChanged = !string.Equals(entity.Don_Vi_Tien, normalizedDonViTien, StringComparison.Ordinal);
+
             entity.So_Phieu_Nhap_Kho = normalizedSoPhieu;
-            entity.Kho_ID = model.Kho_ID;
+            entity.Kho_ID = newKhoId;
             entity.NCC_ID = model.NCC_ID;
-            entity.Ngay_Nhap_Kho = model.Ngay_Nhap_Kho.Date;
+            entity.Ngay_Nhap_Kho = newNgayNhap;
+            entity.Don_Vi_Tien = normalizedDonViTien;
             entity.Ghi_Chu = normalizedGhiChu;
 
+            if (currencyChanged)
+            {
+                foreach (var detail in entity.Nhap_Kho_Raw_Datas.Where(x => x.Is_Active))
+                {
+                    detail.Don_Gia_Nhap = DonViTienOptions.RoundAmount(detail.Don_Gia_Nhap, normalizedDonViTien);
+                }
+            }
+
             await dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
             return ServiceResult.Ok("Hiệu chỉnh thông tin phiếu nhập kho thành công.");
         }
         catch (DbUpdateException ex)
@@ -350,21 +424,41 @@ public sealed class NhapKhoService : INhapKhoService
             return ServiceResult.Fail("Số lượng nhập phải lớn hơn 0.");
         }
 
+        if (!IsWholeQuantity(model.SL_Nhap))
+        {
+            return ServiceResult.Fail("Số lượng nhập phải là số nguyên.");
+        }
+
+        if (model.SL_Nhap > BusinessValidationRules.MaxQuantity)
+        {
+            return ServiceResult.Fail("Số lượng nhập vượt quá giới hạn cho phép của hệ thống.");
+        }
+
         if (model.Don_Gia_Nhap <= 0)
         {
             return ServiceResult.Fail("Đơn giá nhập phải lớn hơn 0.");
+        }
+
+        if (model.Don_Gia_Nhap > BusinessValidationRules.MaxAmount)
+        {
+            return ServiceResult.Fail("Đơn giá nhập vượt quá giới hạn cho phép của hệ thống.");
         }
 
         try
         {
             await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-            var headerExists = await dbContext.NhapKhos.AnyAsync(
+            var header = await dbContext.NhapKhos.FirstOrDefaultAsync(
                 x => x.Nhap_Kho_ID == nhapKhoId && x.Is_Active,
                 cancellationToken);
-            if (!headerExists)
+            if (header is null)
             {
                 return ServiceResult.Fail("Không tìm thấy phiếu nhập kho.");
+            }
+
+            if (!BusinessValidationRules.HasValidAmountScale(model.Don_Gia_Nhap, header.Don_Vi_Tien))
+            {
+                return ServiceResult.Fail(BuildAmountScaleMessage("Đơn giá nhập", header.Don_Vi_Tien));
             }
 
             var productExists = await dbContext.SanPhams.AnyAsync(
@@ -389,8 +483,8 @@ public sealed class NhapKhoService : INhapKhoService
             {
                 Nhap_Kho_ID = nhapKhoId,
                 San_Pham_ID = model.San_Pham_ID,
-                SL_Nhap = decimal.Round(model.SL_Nhap, 2, MidpointRounding.AwayFromZero),
-                Don_Gia_Nhap = decimal.Round(model.Don_Gia_Nhap, 2, MidpointRounding.AwayFromZero),
+                SL_Nhap = NormalizeQuantity(model.SL_Nhap),
+                Don_Gia_Nhap = DonViTienOptions.RoundAmount(model.Don_Gia_Nhap, header.Don_Vi_Tien),
                 Is_Active = true
             });
 
@@ -426,17 +520,34 @@ public sealed class NhapKhoService : INhapKhoService
             return ServiceResult.Fail("Số lượng nhập phải lớn hơn 0.");
         }
 
+        if (!IsWholeQuantity(model.SL_Nhap))
+        {
+            return ServiceResult.Fail("Số lượng nhập phải là số nguyên.");
+        }
+
+        if (model.SL_Nhap > BusinessValidationRules.MaxQuantity)
+        {
+            return ServiceResult.Fail("Số lượng nhập vượt quá giới hạn cho phép của hệ thống.");
+        }
+
         if (model.Don_Gia_Nhap <= 0)
         {
             return ServiceResult.Fail("Đơn giá nhập phải lớn hơn 0.");
         }
 
+        if (model.Don_Gia_Nhap > BusinessValidationRules.MaxAmount)
+        {
+            return ServiceResult.Fail("Đơn giá nhập vượt quá giới hạn cho phép của hệ thống.");
+        }
+
         try
         {
             await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
 
             var line = await dbContext.NhapKhoRawDatas
                 .Include(x => x.Nhap_Kho)
+                .Include(x => x.San_Pham)
                 .FirstOrDefaultAsync(
                     x => x.Nhap_Kho_Raw_Data_ID == model.Nhap_Kho_Raw_Data_ID && x.Is_Active,
                     cancellationToken);
@@ -451,10 +562,39 @@ public sealed class NhapKhoService : INhapKhoService
                 return ServiceResult.Fail("Không thể cập nhật vì phiếu nhập đã bị ngưng sử dụng.");
             }
 
-            line.SL_Nhap = decimal.Round(model.SL_Nhap, 2, MidpointRounding.AwayFromZero);
-            line.Don_Gia_Nhap = decimal.Round(model.Don_Gia_Nhap, 2, MidpointRounding.AwayFromZero);
+            if (!BusinessValidationRules.HasValidAmountScale(model.Don_Gia_Nhap, line.Nhap_Kho.Don_Vi_Tien))
+            {
+                return ServiceResult.Fail(BuildAmountScaleMessage("Đơn giá nhập", line.Nhap_Kho.Don_Vi_Tien));
+            }
+
+            var soLuongNhap = NormalizeQuantity(model.SL_Nhap);
+            var stockValidation = await ValidateNhapMutationStockAsync(
+                dbContext,
+                line.Nhap_Kho.Kho_ID,
+                [line.San_Pham_ID],
+                excludeNhapKhoId: null,
+                excludeNhapKhoRawDataId: line.Nhap_Kho_Raw_Data_ID,
+                replacementNhapMovements:
+                [
+                    new ReplacementNhapMovement(
+                        line.San_Pham_ID,
+                        line.Nhap_Kho.Ngay_Nhap_Kho,
+                        soLuongNhap,
+                        line.Nhap_Kho_ID,
+                        line.Nhap_Kho_Raw_Data_ID)
+                ],
+                "Không thể cập nhật dòng chi tiết nhập kho",
+                cancellationToken);
+            if (!stockValidation.Success)
+            {
+                return stockValidation;
+            }
+
+            line.SL_Nhap = soLuongNhap;
+            line.Don_Gia_Nhap = DonViTienOptions.RoundAmount(model.Don_Gia_Nhap, line.Nhap_Kho.Don_Vi_Tien);
 
             await dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
             return ServiceResult.Ok("Cập nhật dòng chi tiết thành công.");
         }
         catch (DbUpdateException ex)
@@ -482,9 +622,11 @@ public sealed class NhapKhoService : INhapKhoService
         try
         {
             await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
 
             var line = await dbContext.NhapKhoRawDatas
                 .Include(x => x.Nhap_Kho)
+                .Include(x => x.San_Pham)
                 .FirstOrDefaultAsync(
                     x => x.Nhap_Kho_Raw_Data_ID == nhapKhoRawDataId && x.Is_Active,
                     cancellationToken);
@@ -499,8 +641,31 @@ public sealed class NhapKhoService : INhapKhoService
                 return ServiceResult.Fail("Không thể xóa vì phiếu nhập đã bị ngưng sử dụng.");
             }
 
+            var activeDetailCount = await dbContext.NhapKhoRawDatas.CountAsync(
+                x => x.Nhap_Kho_ID == line.Nhap_Kho_ID && x.Is_Active,
+                cancellationToken);
+            if (activeDetailCount <= 1)
+            {
+                return ServiceResult.Fail("Phiếu nhập phải có ít nhất 1 dòng chi tiết, không thể xóa dòng cuối cùng.");
+            }
+
+            var stockValidation = await ValidateNhapMutationStockAsync(
+                dbContext,
+                line.Nhap_Kho.Kho_ID,
+                [line.San_Pham_ID],
+                excludeNhapKhoId: null,
+                excludeNhapKhoRawDataId: line.Nhap_Kho_Raw_Data_ID,
+                replacementNhapMovements: null,
+                "Không thể xóa dòng chi tiết nhập kho",
+                cancellationToken);
+            if (!stockValidation.Success)
+            {
+                return stockValidation;
+            }
+
             line.Is_Active = false;
             await dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
 
             return ServiceResult.Ok("Đã xóa dòng chi tiết khỏi danh sách hiển thị.");
         }
@@ -529,6 +694,7 @@ public sealed class NhapKhoService : INhapKhoService
         try
         {
             await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
 
             var entity = await dbContext.NhapKhos
                 .Include(x => x.Nhap_Kho_Raw_Datas)
@@ -544,6 +710,26 @@ public sealed class NhapKhoService : INhapKhoService
                 return ServiceResult.Fail("Phiếu nhập kho này đã được xóa khỏi danh sách hiển thị trước đó.");
             }
 
+            var activeDetails = entity.Nhap_Kho_Raw_Datas
+                .Where(x => x.Is_Active)
+                .ToList();
+            if (activeDetails.Count > 0)
+            {
+                var stockValidation = await ValidateNhapMutationStockAsync(
+                    dbContext,
+                    entity.Kho_ID,
+                    activeDetails.Select(x => x.San_Pham_ID).ToList(),
+                    excludeNhapKhoId: entity.Nhap_Kho_ID,
+                    excludeNhapKhoRawDataId: null,
+                    replacementNhapMovements: null,
+                    "Không thể xóa phiếu nhập kho",
+                    cancellationToken);
+                if (!stockValidation.Success)
+                {
+                    return stockValidation;
+                }
+            }
+
             entity.Is_Active = false;
             foreach (var detail in entity.Nhap_Kho_Raw_Datas)
             {
@@ -551,7 +737,8 @@ public sealed class NhapKhoService : INhapKhoService
             }
 
             await dbContext.SaveChangesAsync(cancellationToken);
-            return ServiceResult.Ok("Đã xóa khỏi danh sách hiển thị. Dữ liệu vẫn được lưu trong hệ thống.");
+            await transaction.CommitAsync(cancellationToken);
+            return ServiceResult.Ok("Đã xóa khỏi danh sách.");
         }
         catch (DbUpdateException ex)
         {
@@ -568,6 +755,7 @@ public sealed class NhapKhoService : INhapKhoService
     private static ServiceResult ValidateBusinessRules(NhapKhoCreateVm model)
     {
         if (model is null)
+
         {
             return ServiceResult.Fail("Dữ liệu không hợp lệ.");
         }
@@ -583,6 +771,11 @@ public sealed class NhapKhoService : INhapKhoService
             return ServiceResult.Fail("Số phiếu nhập tối đa 50 ký tự.");
         }
 
+        if (!BusinessValidationRules.IsValidCode(normalizedSoPhieu))
+        {
+            return ServiceResult.Fail("Số phiếu nhập chỉ gồm chữ in hoa, số và các ký tự . _ / -.");
+        }
+
         if (model.Kho_ID <= 0)
         {
             return ServiceResult.Fail("Kho không được để trống.");
@@ -596,6 +789,17 @@ public sealed class NhapKhoService : INhapKhoService
         if (model.Ngay_Nhap_Kho == default)
         {
             return ServiceResult.Fail("Ngày nhập kho không được để trống.");
+        }
+
+        if (!BusinessValidationRules.IsValidVoucherDate(model.Ngay_Nhap_Kho))
+        {
+            return ServiceResult.Fail(
+                $"Ngày nhập kho phải trong khoảng {BusinessValidationRules.MinVoucherDate:dd/MM/yyyy} đến {BusinessValidationRules.MaxVoucherDate:dd/MM/yyyy}.");
+        }
+
+        if (!DonViTienOptions.IsSupported(model.Don_Vi_Tien))
+        {
+            return ServiceResult.Fail("Đơn vị tiền không hợp lệ.");
         }
 
         var ghiChu = NormalizeNullableText(model.Ghi_Chu);
@@ -630,9 +834,29 @@ public sealed class NhapKhoService : INhapKhoService
                 return ServiceResult.Fail($"Dòng {lineNo}: Số lượng nhập phải lớn hơn 0.");
             }
 
+            if (!IsWholeQuantity(line.SL_Nhap))
+            {
+                return ServiceResult.Fail($"Dòng {lineNo}: Số lượng nhập phải là số nguyên.");
+            }
+
+            if (line.SL_Nhap > BusinessValidationRules.MaxQuantity)
+            {
+                return ServiceResult.Fail($"Dòng {lineNo}: Số lượng nhập vượt quá giới hạn cho phép của hệ thống.");
+            }
+
             if (line.Don_Gia_Nhap <= 0)
             {
                 return ServiceResult.Fail($"Dòng {lineNo}: Đơn giá nhập phải lớn hơn 0.");
+            }
+
+            if (line.Don_Gia_Nhap > BusinessValidationRules.MaxAmount)
+            {
+                return ServiceResult.Fail($"Dòng {lineNo}: Đơn giá nhập vượt quá giới hạn cho phép của hệ thống.");
+            }
+
+            if (!BusinessValidationRules.HasValidAmountScale(line.Don_Gia_Nhap, model.Don_Vi_Tien))
+            {
+                return ServiceResult.Fail($"Dòng {lineNo}: {BuildAmountScaleMessage("Đơn giá nhập", model.Don_Vi_Tien)}");
             }
         }
 
@@ -657,6 +881,11 @@ public sealed class NhapKhoService : INhapKhoService
             return ServiceResult.Fail("Số phiếu nhập tối đa 50 ký tự.");
         }
 
+        if (!BusinessValidationRules.IsValidCode(normalizedSoPhieu))
+        {
+            return ServiceResult.Fail("Số phiếu nhập chỉ gồm chữ in hoa, số và các ký tự . _ / -.");
+        }
+
         if (model.Kho_ID <= 0)
         {
             return ServiceResult.Fail("Kho không được để trống.");
@@ -672,6 +901,17 @@ public sealed class NhapKhoService : INhapKhoService
             return ServiceResult.Fail("Ngày nhập kho không được để trống.");
         }
 
+        if (!BusinessValidationRules.IsValidVoucherDate(model.Ngay_Nhap_Kho))
+        {
+            return ServiceResult.Fail(
+                $"Ngày nhập kho phải trong khoảng {BusinessValidationRules.MinVoucherDate:dd/MM/yyyy} đến {BusinessValidationRules.MaxVoucherDate:dd/MM/yyyy}.");
+        }
+
+        if (!DonViTienOptions.IsSupported(model.Don_Vi_Tien))
+        {
+            return ServiceResult.Fail("Đơn vị tiền không hợp lệ.");
+        }
+
         var ghiChu = NormalizeNullableText(model.Ghi_Chu);
         if (ghiChu is not null && ghiChu.Length > 255)
         {
@@ -681,14 +921,16 @@ public sealed class NhapKhoService : INhapKhoService
         return ServiceResult.Ok();
     }
 
-    private static List<NhapKhoRawDataUpsertVm> NormalizeDetails(IEnumerable<NhapKhoRawDataUpsertVm> details)
+    private static List<NhapKhoRawDataUpsertVm> NormalizeDetails(
+        IEnumerable<NhapKhoRawDataUpsertVm> details,
+        string donViTien)
     {
         return details
             .Select(x => new NhapKhoRawDataUpsertVm
             {
                 San_Pham_ID = x.San_Pham_ID,
-                SL_Nhap = decimal.Round(x.SL_Nhap, 2, MidpointRounding.AwayFromZero),
-                Don_Gia_Nhap = decimal.Round(x.Don_Gia_Nhap, 2, MidpointRounding.AwayFromZero)
+                SL_Nhap = NormalizeQuantity(x.SL_Nhap),
+                Don_Gia_Nhap = DonViTienOptions.RoundAmount(x.Don_Gia_Nhap, donViTien)
             })
             .ToList();
     }
@@ -722,6 +964,203 @@ public sealed class NhapKhoService : INhapKhoService
 
         return value.Trim().ToUpperInvariant();
     }
+
+    private static string NormalizeDonViTien(string? value)
+    {
+        return DonViTienOptions.Normalize(value);
+    }
+
+    private static bool IsWholeQuantity(decimal value)
+    {
+        return value == decimal.Truncate(value);
+    }
+
+    private static decimal NormalizeQuantity(decimal value)
+    {
+        return decimal.Round(value, 0, MidpointRounding.AwayFromZero);
+    }
+
+    private static string BuildAmountScaleMessage(string fieldLabel, string? donViTien)
+    {
+        return DonViTienOptions.UsesDecimalAmount(donViTien)
+            ? $"{fieldLabel} tối đa 2 chữ số thập phân khi đơn vị tiền là USD."
+            : $"{fieldLabel} không được có phần thập phân khi đơn vị tiền là VND.";
+    }
+
+    private async Task<ServiceResult> ValidateNhapMutationStockAsync(
+        AppDbContext dbContext,
+        int khoId,
+        IReadOnlyCollection<int> sanPhamIds,
+        int? excludeNhapKhoId,
+        int? excludeNhapKhoRawDataId,
+        IReadOnlyCollection<ReplacementNhapMovement>? replacementNhapMovements,
+        string operationName,
+        CancellationToken cancellationToken)
+    {
+        var normalizedSanPhamIds = sanPhamIds
+            .Distinct()
+            .ToList();
+        if (normalizedSanPhamIds.Count == 0)
+        {
+            return ServiceResult.Ok();
+        }
+
+        var nhapQuery = dbContext.NhapKhoRawDatas
+            .AsNoTracking()
+            .Where(x => x.Is_Active
+                        && normalizedSanPhamIds.Contains(x.San_Pham_ID)
+                        && x.Nhap_Kho != null
+                        && x.Nhap_Kho.Is_Active
+                        && x.Nhap_Kho.Kho_ID == khoId);
+
+        if (excludeNhapKhoId.HasValue)
+        {
+            nhapQuery = nhapQuery.Where(x => x.Nhap_Kho_ID != excludeNhapKhoId.Value);
+        }
+
+        if (excludeNhapKhoRawDataId.HasValue)
+        {
+            nhapQuery = nhapQuery.Where(x => x.Nhap_Kho_Raw_Data_ID != excludeNhapKhoRawDataId.Value);
+        }
+
+        var nhapMovements = await nhapQuery
+            .Select(x => new StockLedgerMovement(
+                x.San_Pham_ID,
+                x.Nhap_Kho!.Ngay_Nhap_Kho,
+                x.SL_Nhap,
+                true,
+                x.Nhap_Kho_ID,
+                x.Nhap_Kho_Raw_Data_ID))
+            .ToListAsync(cancellationToken);
+
+        var xuatMovements = await dbContext.XuatKhoRawDatas
+            .AsNoTracking()
+            .Where(x => x.Is_Active
+                        && normalizedSanPhamIds.Contains(x.San_Pham_ID)
+                        && x.Xuat_Kho != null
+                        && x.Xuat_Kho.Is_Active
+                        && x.Xuat_Kho.Kho_ID == khoId)
+            .Select(x => new StockLedgerMovement(
+                x.San_Pham_ID,
+                x.Xuat_Kho!.Ngay_Xuat_Kho,
+                -x.SL_Xuat,
+                false,
+                x.Xuat_Kho_ID,
+                x.Xuat_Kho_Raw_Data_ID))
+            .ToListAsync(cancellationToken);
+
+        var allMovements = new List<StockLedgerMovement>(nhapMovements.Count + xuatMovements.Count + (replacementNhapMovements?.Count ?? 0));
+        allMovements.AddRange(nhapMovements);
+        allMovements.AddRange(xuatMovements);
+
+        if (replacementNhapMovements is not null)
+        {
+            allMovements.AddRange(replacementNhapMovements.Select(x => new StockLedgerMovement(
+                x.SanPhamId,
+                x.NgayNhap,
+                x.SoLuongNhap,
+                true,
+                x.ChungTuId,
+                x.LineId)));
+        }
+
+        var failure = FindFirstNegativeStock(allMovements, normalizedSanPhamIds);
+        if (failure is null)
+        {
+            return ServiceResult.Ok();
+        }
+
+        var productInfo = await dbContext.SanPhams
+            .AsNoTracking()
+            .Where(x => x.San_Pham_ID == failure.SanPhamId)
+            .Select(x => new
+            {
+                x.San_Pham_ID,
+                x.Ma_San_Pham,
+                x.Ten_San_Pham
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var tenSanPham = productInfo is null
+            ? $"SP-{failure.SanPhamId}"
+            : BuildSanPhamDisplayName(productInfo.Ma_San_Pham, productInfo.Ten_San_Pham, productInfo.San_Pham_ID);
+
+        return ServiceResult.Fail(
+            $"{operationName} vì sẽ làm âm tồn kho sản phẩm '{tenSanPham}' tại kho đã chọn vào ngày {failure.NgayPhatSinh:dd/MM/yyyy}. Tồn dự kiến sau phát sinh: {DonViTienOptions.FormatQuantity(failure.TonSauPhatSinh)}.");
+    }
+
+    private static NegativeStockIssue? FindFirstNegativeStock(
+        IEnumerable<StockLedgerMovement> movements,
+        IReadOnlyCollection<int> sanPhamIds)
+    {
+        var grouped = movements
+            .GroupBy(x => x.SanPhamId)
+            .ToDictionary(x => x.Key, x => x.ToList());
+
+        foreach (var sanPhamId in sanPhamIds.OrderBy(x => x))
+        {
+            if (!grouped.TryGetValue(sanPhamId, out var sanPhamMovements))
+            {
+                continue;
+            }
+
+            var tonKho = 0m;
+            foreach (var movement in sanPhamMovements
+                         .OrderBy(x => x.NgayPhatSinh)
+                         .ThenBy(x => x.IsNhap ? 0 : 1)
+                         .ThenBy(x => x.ChungTuId)
+                         .ThenBy(x => x.LineId))
+            {
+                tonKho += movement.SoLuongBienDong;
+                if (tonKho < 0)
+                {
+                    return new NegativeStockIssue(sanPhamId, movement.NgayPhatSinh, tonKho);
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static string BuildSanPhamDisplayName(string? maSanPham, string? tenSanPham, int sanPhamId)
+    {
+        if (!string.IsNullOrWhiteSpace(maSanPham) && !string.IsNullOrWhiteSpace(tenSanPham))
+        {
+            return $"{maSanPham} - {tenSanPham}";
+        }
+
+        if (!string.IsNullOrWhiteSpace(maSanPham))
+        {
+            return maSanPham;
+        }
+
+        if (!string.IsNullOrWhiteSpace(tenSanPham))
+        {
+            return tenSanPham;
+        }
+
+        return $"SP-{sanPhamId}";
+    }
+
+    private sealed record StockLedgerMovement(
+        int SanPhamId,
+        DateTime NgayPhatSinh,
+        decimal SoLuongBienDong,
+        bool IsNhap,
+        int ChungTuId,
+        int LineId);
+
+    private sealed record ReplacementNhapMovement(
+        int SanPhamId,
+        DateTime NgayNhap,
+        decimal SoLuongNhap,
+        int ChungTuId,
+        int LineId);
+
+    private sealed record NegativeStockIssue(
+        int SanPhamId,
+        DateTime NgayPhatSinh,
+        decimal TonSauPhatSinh);
 
     private static string? NormalizeNullableText(string? value)
     {

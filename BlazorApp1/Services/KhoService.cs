@@ -67,6 +67,11 @@ public sealed class KhoService : IKhoService
                 return ServiceResult<KhoUpsertVm>.Fail("Không tìm thấy kho.");
             }
 
+            if (!entity.Is_Active)
+            {
+                return ServiceResult<KhoUpsertVm>.Fail("Kho đã ngưng sử dụng.");
+            }
+
             return ServiceResult<KhoUpsertVm>.Ok(new KhoUpsertVm
             {
                 Kho_ID = entity.Kho_ID,
@@ -157,6 +162,11 @@ public sealed class KhoService : IKhoService
                 return ServiceResult.Fail("Không tìm thấy kho để cập nhật.");
             }
 
+            if (!entity.Is_Active)
+            {
+                return ServiceResult.Fail("Kho đã ngưng sử dụng, không thể cập nhật.");
+            }
+
             var duplicated = await ExistsByNameAsync(dbContext, normalizedName, model.Kho_ID, cancellationToken);
             if (duplicated)
             {
@@ -208,9 +218,33 @@ public sealed class KhoService : IKhoService
                 return ServiceResult.Fail("Kho này đã được xóa khỏi danh sách hiển thị trước đó.");
             }
 
+            var hasKhoUserReference = await dbContext.KhoUsers.AnyAsync(
+                x => x.Is_Active && x.Kho_ID == id,
+                cancellationToken);
+            if (hasKhoUserReference)
+            {
+                return ServiceResult.Fail("Không thể xóa kho vì còn phân quyền kho-user đang hoạt động.");
+            }
+
+            var hasNhapReference = await dbContext.NhapKhos.AnyAsync(
+                x => x.Is_Active && x.Kho_ID == id,
+                cancellationToken);
+            if (hasNhapReference)
+            {
+                return ServiceResult.Fail("Không thể xóa kho vì đã phát sinh phiếu nhập kho.");
+            }
+
+            var hasXuatReference = await dbContext.XuatKhos.AnyAsync(
+                x => x.Is_Active && x.Kho_ID == id,
+                cancellationToken);
+            if (hasXuatReference)
+            {
+                return ServiceResult.Fail("Không thể xóa kho vì đã phát sinh phiếu xuất kho.");
+            }
+
             entity.Is_Active = false;
             await dbContext.SaveChangesAsync(cancellationToken);
-            return ServiceResult.Ok("Đã xóa khỏi danh sách hiển thị. Dữ liệu vẫn được lưu trong hệ thống.");
+            return ServiceResult.Ok("Đã xóa khỏi danh sách.");
         }
         catch (DbUpdateException ex)
         {

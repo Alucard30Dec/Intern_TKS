@@ -19,6 +19,11 @@ public interface IXuatKhoService
     Task<ServiceResult<IReadOnlyList<XuatKhoDetailListItemVm>>> GetDetailsAsync(int xuatKhoId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Lay du lieu in phieu xuat kho (bai 14).
+    /// </summary>
+    Task<ServiceResult<XuatKhoPrintVm>> GetPrintDataAsync(int xuatKhoId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Tao moi phieu xuat kho.
     /// </summary>
     Task<ServiceResult> CreateAsync(XuatKhoCreateVm model, CancellationToken cancellationToken = default);

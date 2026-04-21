@@ -236,7 +236,7 @@ Project override for this repository:
 3. List/query methods for catalog screens must only load active records (`Is_Active = true`).
 4. Service delete methods must implement: `DeleteAsync(id)` -> set `Is_Active = false`.
 5. Confirmation text must be explicit:
-   - `Xóa <đối tượng> khỏi danh sách hiển thị? Dữ liệu vẫn được lưu trong hệ thống.`
+   - `Xóa <đối tượng> khỏi danh sách?`
 6. If record was already soft-deleted, return a specific message, not generic failure.
 7. Do not add extra status column/badge unless explicitly requested by user.
 

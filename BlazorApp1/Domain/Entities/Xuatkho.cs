@@ -19,6 +19,10 @@ public sealed class XuatKho
     [Required]
     public DateTime Ngay_Xuat_Kho { get; set; }
 
+    [Required]
+    [MaxLength(3)]
+    public string Don_Vi_Tien { get; set; } = Models.Common.DonViTienOptions.Vnd;
+
     [MaxLength(255)]
     public string? Ghi_Chu { get; set; }
 

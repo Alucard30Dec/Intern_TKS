@@ -228,6 +228,14 @@ namespace BlazorApp1.Infrastructure.Data.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Nhap_Kho_ID"));
 
+                    b.Property<string>("Don_Vi_Tien")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasDefaultValue("VND")
+                        .HasColumnName("Don_Vi_Tien");
+
                     b.Property<string>("Ghi_Chu")
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)")
@@ -272,7 +280,12 @@ namespace BlazorApp1.Infrastructure.Data.Migrations
                         .IsUnique()
                         .HasDatabaseName("UQ_tbl_XNK_Nhap_Kho_So_Phieu_Nhap_Kho");
 
-                    b.ToTable("tbl_XNK_Nhap_Kho", (string)null);
+                    b.ToTable("tbl_XNK_Nhap_Kho", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_tbl_XNK_Nhap_Kho_Don_Vi_Tien_Valid", "\"Don_Vi_Tien\" IN ('VND','USD')");
+
+                            t.HasCheckConstraint("CK_tbl_XNK_Nhap_Kho_Ngay_Nhap_Kho_MinDate", "\"Ngay_Nhap_Kho\" >= DATE '2000-01-01'");
+                        });
                 });
 
             modelBuilder.Entity("BlazorApp1.Domain.Entities.NhapKhoRawData", b =>
@@ -300,8 +313,8 @@ namespace BlazorApp1.Infrastructure.Data.Migrations
                         .HasColumnName("Nhap_Kho_ID");
 
                     b.Property<decimal>("SL_Nhap")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
+                        .HasPrecision(18)
+                        .HasColumnType("numeric(18,0)")
                         .HasColumnName("SL_Nhap");
 
                     b.Property<int>("San_Pham_ID")
@@ -316,7 +329,17 @@ namespace BlazorApp1.Infrastructure.Data.Migrations
                     b.HasIndex("San_Pham_ID")
                         .HasDatabaseName("IX_tbl_DM_Nhap_Kho_Raw_Data_San_Pham_ID");
 
-                    b.ToTable("tbl_DM_Nhap_Kho_Raw_Data", (string)null);
+                    b.HasIndex("Nhap_Kho_ID", "San_Pham_ID", "Is_Active")
+                        .IsUnique()
+                        .HasDatabaseName("UQ_tbl_DM_Nhap_Kho_Raw_Data_Nhap_Kho_ID_San_Pham_ID_Active")
+                        .HasFilter("\"Is_Active\" = TRUE");
+
+                    b.ToTable("tbl_DM_Nhap_Kho_Raw_Data", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_tbl_DM_Nhap_Kho_Raw_Data_Don_Gia_Nhap_Positive", "\"Don_Gia_Nhap\" > 0");
+
+                            t.HasCheckConstraint("CK_tbl_DM_Nhap_Kho_Raw_Data_SL_Nhap_Positive", "\"SL_Nhap\" > 0");
+                        });
                 });
 
             modelBuilder.Entity("BlazorApp1.Domain.Entities.SanPham", b =>
@@ -383,6 +406,14 @@ namespace BlazorApp1.Infrastructure.Data.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Xuat_Kho_ID"));
 
+                    b.Property<string>("Don_Vi_Tien")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasDefaultValue("VND")
+                        .HasColumnName("Don_Vi_Tien");
+
                     b.Property<string>("Ghi_Chu")
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)")
@@ -420,7 +451,12 @@ namespace BlazorApp1.Infrastructure.Data.Migrations
                         .IsUnique()
                         .HasDatabaseName("UQ_tbl_XNK_Xuat_Kho_So_Phieu_Xuat_Kho");
 
-                    b.ToTable("tbl_XNK_Xuat_Kho", (string)null);
+                    b.ToTable("tbl_XNK_Xuat_Kho", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_tbl_XNK_Xuat_Kho_Don_Vi_Tien_Valid", "\"Don_Vi_Tien\" IN ('VND','USD')");
+
+                            t.HasCheckConstraint("CK_tbl_XNK_Xuat_Kho_Ngay_Xuat_Kho_MinDate", "\"Ngay_Xuat_Kho\" >= DATE '2000-01-01'");
+                        });
                 });
 
             modelBuilder.Entity("BlazorApp1.Domain.Entities.XuatKhoRawData", b =>
@@ -444,8 +480,8 @@ namespace BlazorApp1.Infrastructure.Data.Migrations
                         .HasColumnName("Is_Active");
 
                     b.Property<decimal>("SL_Xuat")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
+                        .HasPrecision(18)
+                        .HasColumnType("numeric(18,0)")
                         .HasColumnName("SL_Xuat");
 
                     b.Property<int>("San_Pham_ID")
@@ -464,7 +500,17 @@ namespace BlazorApp1.Infrastructure.Data.Migrations
                     b.HasIndex("Xuat_Kho_ID")
                         .HasDatabaseName("IX_tbl_DM_Xuat_Kho_Raw_Data_Xuat_Kho_ID");
 
-                    b.ToTable("tbl_DM_Xuat_Kho_Raw_Data", (string)null);
+                    b.HasIndex("Xuat_Kho_ID", "San_Pham_ID", "Is_Active")
+                        .IsUnique()
+                        .HasDatabaseName("UQ_tbl_DM_Xuat_Kho_Raw_Data_Xuat_Kho_ID_San_Pham_ID_Active")
+                        .HasFilter("\"Is_Active\" = TRUE");
+
+                    b.ToTable("tbl_DM_Xuat_Kho_Raw_Data", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_tbl_DM_Xuat_Kho_Raw_Data_Don_Gia_Xuat_Positive", "\"Don_Gia_Xuat\" > 0");
+
+                            t.HasCheckConstraint("CK_tbl_DM_Xuat_Kho_Raw_Data_SL_Xuat_Positive", "\"SL_Xuat\" > 0");
+                        });
                 });
 
             modelBuilder.Entity("BlazorApp1.Domain.Entities.KhoUser", b =>

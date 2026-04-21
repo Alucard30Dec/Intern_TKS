@@ -337,7 +337,7 @@
 
         var confirmed = await JS.InvokeAsync<bool>(
             "confirm",
-            $"Xóa phân quyền '{maDangNhap} - {tenKho}' khỏi danh sách hiển thị? Dữ liệu vẫn được lưu trong hệ thống.");
+            $"Xóa phân quyền '{maDangNhap} - {tenKho}' khỏi danh sách?");
 
         if (!confirmed)
         {

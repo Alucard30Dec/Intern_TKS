@@ -311,7 +311,7 @@
 
         var confirmed = await JS.InvokeAsync<bool>(
             "confirm",
-            $"Xóa kho '{tenKho}' khỏi danh sách hiển thị? Dữ liệu vẫn được lưu trong hệ thống.");
+            $"Xóa kho '{tenKho}' khỏi danh sách?");
 
         if (!confirmed)
         {
