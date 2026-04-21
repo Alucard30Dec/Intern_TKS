@@ -1,4 +1,4 @@
-# BlazorApp1 - Bai 1 + Bai 2 + Bai 3 + Bai 4 + Bai 5 + Bai 6 + Bai 7
+# BlazorApp1 - Bai 1 + Bai 2 + Bai 3 + Bai 4 + Bai 5 + Bai 6 + Bai 7 + Bai 8 + Bai 9 + Bai 10
 
 Ung dung Blazor Server (.NET 8) cho bai thuc tap:
 
@@ -9,8 +9,11 @@ Ung dung Blazor Server (.NET 8) cho bai thuc tap:
 - Bai 5: Danh muc kho (`/danh-muc/kho`)
 - Bai 6: Phan quyen kho-user (`/phan-quyen/kho-user`)
 - Bai 7: Quan ly phieu nhap kho (`/nhap-kho`)
+- Bai 8: Hieu chinh thong tin phieu nhap (header only, dung tren `/nhap-kho`)
+- Bai 9: Hieu chinh chi tiet phieu nhap (them/sua/xoa dong chi tiet, dung tren `/nhap-kho`)
+- Bai 10: In phieu nhap tu man hinh bai 7 (`/nhap-kho/in/{id}`)
 
-Du an dung PostgreSQL + EF Core, co validation va CRUD/phan quyen day du cho Bai 1 den Bai 7.
+Du an dung PostgreSQL + EF Core, co validation va CRUD/phan quyen day du cho Bai 1 den Bai 10.
 
 ## 1) Yeu cau moi truong
 
@@ -55,6 +58,7 @@ Migration hien co:
 - `20260420084121_AddKhoCatalogAndRequireUniqueSupplierCode`
 - `20260420085334_AddKhoUserPermissionForBai6`
 - `20260420090847_AddNhapKhoManagementForBai7`
+- `20260420181849_AddNhapKhoHeaderEditForBai8`
 
 Cap nhat DB:
 
@@ -87,8 +91,12 @@ Mo URL in trong console, sau do vao menu Bai 1/Bai 2/Bai 3/Bai 4/Bai 5/Bai 6/Bai
 4. Bai 4: tao, sua, tim kiem theo ma/ten/ghi chu, xoa mem nha cung cap (an khoi UI), ma NCC bat buoc va duy nhat.
 5. Bai 5: tao, sua, tim kiem theo ten/ghi chu, xoa mem kho (an khoi UI).
 6. Bai 6: them/sua/tim kiem phan quyen kho-user theo `Ma_Dang_Nhap`, `Kho_ID`; bo key `Ma_Dang_Nhap + Kho_ID` la duy nhat; xoa mem an khoi UI.
-7. Bai 7: tao va xoa phieu nhap kho (khong cho sua), bat buoc `So_Phieu_Nhap_Kho`, `Kho`, `NCC`, `Ngay_Nhap_Kho`; so phieu duy nhat; co luu chi tiet vao `tbl_DM_Nhap_Kho_Raw_Data`.
-8. Reload trang, xac nhan du lieu van ton tai.
+7. Bai 7: tao va xoa phieu nhap kho, bat buoc `So_Phieu_Nhap_Kho`, `Kho`, `NCC`, `Ngay_Nhap_Kho`; so phieu duy nhat; co luu chi tiet vao `tbl_DM_Nhap_Kho_Raw_Data`.
+8. Bai 8: hieu chinh phan header phieu nhap (So phieu/Kho/NCC/Ngay/Ghi chu), du lieu header luu o `tbl_XNK_Nhap_Kho`.
+9. Bai 9: hieu chinh chi tiet phieu nhap tren modal rieng gom khung thong tin header (label only) + luoi data chi tiet, cho phep them/sua/xoa dong.
+10. Rang buoc Bai 9: khi them bat buoc nhap Ma san pham, So luong, Don gia; khi sua chi duoc sua So luong va Don gia, khong duoc doi Ma san pham.
+11. Bai 10: tu danh sach bai 7 nhan nut In de mo form in phieu nhap, xem day du header + chi tiet + tong tri gia, in bang `window.print`.
+12. Reload trang, xac nhan du lieu van ton tai.
 
 Luu y nghiep vu xoa:
 

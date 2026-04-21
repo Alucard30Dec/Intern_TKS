@@ -1,0 +1,345 @@
+@page "/nhap-kho/{NhapKhoId:int}/print"
+@page "/nhap-kho/in/{NhapKhoId:int}"
+@using BlazorApp1.Components.Layout
+@layout PrintLayout
+@rendermode InteractiveServer
+@using BlazorApp1.Models.NhapKho
+@using BlazorApp1.Services.Interfaces
+@using System.Globalization
+@inject INhapKhoService NhapKhoService
+@inject IJSRuntime JS
+@inject NavigationManager NavigationManager
+@inject ILogger<NhapKhoPrintPage> Logger
+
+<PageTitle>In phiếu nhập kho</PageTitle>
+
+<section class="print-page">
+    <div class="print-toolbar no-print">
+        <button type="button" class="print-button" @onclick="PrintAsync">In phiếu</button>
+        <button type="button" class="print-button print-button--secondary" @onclick="BackToList">Quay lại</button>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="print-state">Đang tải dữ liệu in phiếu nhập...</div>
+    }
+    else if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="print-state print-state--error">@errorMessage</div>
+    }
+    else if (printData is not null)
+    {
+        <article class="print-sheet">
+            <header class="sheet-top">
+                <div class="sheet-top__left">
+                    <p><strong>Đơn vị :</strong> @DisplayOrPlaceholder(printData.Ten_Kho)</p>
+                    <p><strong>Bộ phận :</strong> .......................................................</p>
+                </div>
+                <div class="sheet-top__right">
+                    <p class="sheet-top__code">Mẫu Số : 01 - VT</p>
+                    <p>(Ban Hành Theo QĐ Số 15/2006/QĐ-BTC)</p>
+                    <p>Ngày 20/03/2006 Của Bộ Trưởng BTC</p>
+                </div>
+            </header>
+
+            <section class="sheet-title-block">
+                <h1>PHIẾU NHẬP KHO</h1>
+            </section>
+
+            <section class="sheet-meta">
+                <div class="sheet-meta__left">
+                    <p><strong>Ngày:</strong> @FormatDateLong(printData.Ngay_Nhap_Kho)</p>
+                    <p><strong>Số Phiếu Nhập:</strong> @DisplayOrPlaceholder(printData.So_Phieu_Nhap_Kho)</p>
+                    <p><strong>Họ Tên Người Giao Hàng:</strong> @DisplayOrPlaceholder(printData.Ten_NCC)</p>
+                    <p><strong>Theo TK Số:</strong> .......................................................</p>
+                    <p><strong>Nhập Tại Kho:</strong> @DisplayOrPlaceholder(printData.Ten_Kho)</p>
+                </div>
+                <div class="sheet-meta__right">
+                    <p><strong>Nợ:</strong> ...................................</p>
+                    <p><strong>Có:</strong> ....................................</p>
+                    <p><strong>Địa Điểm:</strong> @DisplayOrPlaceholder(printData.Ten_Kho)</p>
+                </div>
+            </section>
+
+            <section class="sheet-table-wrap">
+                <table class="sheet-table">
+                    <colgroup>
+                        <col style="width: 5%" />
+                        <col style="width: 28%" />
+                        <col style="width: 14%" />
+                        <col style="width: 9%" />
+                        <col style="width: 8%" />
+                        <col style="width: 8%" />
+                        <col style="width: 12%" />
+                        <col style="width: 16%" />
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th rowspan="2">STT</th>
+                            <th rowspan="2">Tên nhãn hiệu, quy cách, phẩm chất, vật tư, dụng cụ, sản phẩm, hàng hóa</th>
+                            <th rowspan="2">Mã Hàng</th>
+                            <th rowspan="2">Đơn Vị Tính</th>
+                            <th colspan="2">Số Lượng</th>
+                            <th rowspan="2">Đơn Giá</th>
+                            <th rowspan="2">Thành Tiền</th>
+                        </tr>
+                        <tr>
+                            <th>Kiện</th>
+                            <th>Cái</th>
+                        </tr>
+                        <tr class="sheet-table__index-row">
+                            <th>A</th>
+                            <th>B</th>
+                            <th>C</th>
+                            <th>D</th>
+                            <th>1</th>
+                            <th>2</th>
+                            <th>3</th>
+                            <th>4</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (printData.Lines.Count == 0)
+                        {
+                            <tr>
+                                <td colspan="8" class="sheet-table__empty">Phiếu nhập chưa có dòng chi tiết.</td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @for (var i = 0; i < printData.Lines.Count; i++)
+                            {
+                                var line = printData.Lines[i];
+                                <tr>
+                                    <td>@(i + 1)</td>
+                                    <td>@DisplayOrPlaceholder(line.Ten_San_Pham, "[Chưa có tên hàng]")</td>
+                                    <td>@DisplayOrPlaceholder(line.Ma_San_Pham, "[Chưa có mã]")</td>
+                                    <td>@DisplayOrPlaceholder(line.Ten_Don_Vi_Tinh, "[Chưa có ĐVT]")</td>
+                                    <td class="sheet-table__number">@line.SL_Nhap.ToString("N0", ViVn)</td>
+                                    <td class="sheet-table__number">@line.SL_Nhap.ToString("N0", ViVn)</td>
+                                    <td class="sheet-table__number">@line.Don_Gia_Nhap.ToString("N2", ViVn)</td>
+                                    <td class="sheet-table__number">@line.Tri_Gia.ToString("N2", ViVn)</td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="4" class="sheet-table__total-label">Tổng</td>
+                            <td class="sheet-table__number">@printData.Lines.Sum(x => x.SL_Nhap).ToString("N0", ViVn)</td>
+                            <td class="sheet-table__number">@printData.Lines.Sum(x => x.SL_Nhap).ToString("N0", ViVn)</td>
+                            <td></td>
+                            <td class="sheet-table__number">@printData.Tong_Tri_Gia.ToString("N2", ViVn)</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </section>
+
+            <section class="sheet-footer">
+                <p><strong>Tổng Số Tiền (Viết bằng chữ) :</strong> @ConvertMoneyToWords(printData.Tong_Tri_Gia)</p>
+                <p><strong>Số Chứng Từ Gốc Kèm Theo:</strong> .........................................................</p>
+                <p class="sheet-footer__date-line">Ngày ..... Tháng ..... Năm ......</p>
+            </section>
+
+            <footer class="sheet-signature">
+                <div class="sheet-signature__col">
+                    <p>Người Lập Phiếu</p>
+                    <span>(Ký, họ tên)</span>
+                </div>
+                <div class="sheet-signature__col">
+                    <p>Người Giao Hàng</p>
+                    <span>(Ký, họ tên)</span>
+                </div>
+                <div class="sheet-signature__col">
+                    <p>Thủ Kho</p>
+                    <span>(Ký, họ tên)</span>
+                </div>
+                <div class="sheet-signature__col">
+                    <p>Kế Toán Trưởng</p>
+                    <span>(Ký, họ tên)</span>
+                </div>
+            </footer>
+        </article>
+    }
+</section>
+
+@code {
+    [Parameter]
+    public int NhapKhoId { get; set; }
+
+    private NhapKhoPrintVm? printData;
+    private bool isLoading = true;
+    private string? errorMessage;
+    private static readonly CultureInfo ViVn = new("vi-VN");
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadPrintDataAsync();
+    }
+
+    private async Task LoadPrintDataAsync()
+    {
+        if (NhapKhoId <= 0)
+        {
+            errorMessage = "ID phiếu nhập không hợp lệ.";
+            isLoading = false;
+            return;
+        }
+
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            var result = await NhapKhoService.GetPrintDataAsync(NhapKhoId);
+            if (!result.Success || result.Data is null)
+            {
+                errorMessage = result.Message;
+                printData = null;
+                return;
+            }
+
+            printData = result.Data;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Load print data failed. Nhap_Kho_ID={Nhap_Kho_ID}", NhapKhoId);
+            errorMessage = "Không thể tải dữ liệu in phiếu nhập kho.";
+            printData = null;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task PrintAsync()
+    {
+        await JS.InvokeVoidAsync("print");
+    }
+
+    private void BackToList()
+    {
+        NavigationManager.NavigateTo("/nhap-kho");
+    }
+
+    private static string FormatDateLong(DateTime date)
+    {
+        return $"Ngày {date:dd} tháng {date:MM} năm {date:yyyy}";
+    }
+
+    private static string DisplayOrPlaceholder(string? text, string placeholder = ".......................................................")
+    {
+        return string.IsNullOrWhiteSpace(text) ? placeholder : text.Trim();
+    }
+
+    private static string ConvertMoneyToWords(decimal value)
+    {
+        var amount = (long)Math.Round(value, 0, MidpointRounding.AwayFromZero);
+        if (amount == 0)
+        {
+            return "Không đồng";
+        }
+
+        var words = ConvertNumberToVietnamese(amount).Trim();
+        return $"{char.ToUpper(words[0])}{words[1..]} đồng";
+    }
+
+    private static string ConvertNumberToVietnamese(long number)
+    {
+        var units = new[] { "", " nghìn", " triệu", " tỷ", " nghìn tỷ", " triệu tỷ" };
+        var parts = new List<string>();
+        var unitIndex = 0;
+
+        while (number > 0)
+        {
+            var chunk = (int)(number % 1000);
+            if (chunk > 0)
+            {
+                var prefix = ReadThreeDigits(chunk, unitIndex > 0 && number / 1000 > 0);
+                parts.Insert(0, $"{prefix}{units[unitIndex]}");
+            }
+
+            number /= 1000;
+            unitIndex++;
+        }
+
+        return string.Join(" ", parts.Where(x => !string.IsNullOrWhiteSpace(x)))
+            .Replace("  ", " ")
+            .Trim();
+    }
+
+    private static string ReadThreeDigits(int number, bool full)
+    {
+        var hundreds = number / 100;
+        var tens = (number % 100) / 10;
+        var ones = number % 10;
+        var words = new List<string>();
+
+        if (full || hundreds > 0)
+        {
+            words.Add($"{DigitWord(hundreds)} trăm");
+        }
+
+        if (tens > 1)
+        {
+            words.Add($"{DigitWord(tens)} mươi");
+            if (ones == 1)
+            {
+                words.Add("mốt");
+            }
+            else if (ones == 5)
+            {
+                words.Add("lăm");
+            }
+            else if (ones > 0)
+            {
+                words.Add(DigitWord(ones));
+            }
+        }
+        else if (tens == 1)
+        {
+            words.Add("mười");
+            if (ones == 5)
+            {
+                words.Add("lăm");
+            }
+            else if (ones > 0)
+            {
+                words.Add(DigitWord(ones));
+            }
+        }
+        else
+        {
+            if (ones > 0)
+            {
+                if (hundreds > 0 || full)
+                {
+                    words.Add("lẻ");
+                }
+
+                words.Add(ones == 5 && (hundreds > 0 || full) ? "năm" : DigitWord(ones));
+            }
+        }
+
+        return string.Join(" ", words).Trim();
+    }
+
+    private static string DigitWord(int digit)
+    {
+        return digit switch
+        {
+            0 => "không",
+            1 => "một",
+            2 => "hai",
+            3 => "ba",
+            4 => "bốn",
+            5 => "năm",
+            6 => "sáu",
+            7 => "bảy",
+            8 => "tám",
+            9 => "chín",
+            _ => string.Empty
+        };
+    }
+}

@@ -7,8 +7,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
-    <link rel="stylesheet" href="app.css" />
-    <link rel="stylesheet" href="BlazorApp1.styles.css" />
+    <link rel="stylesheet" href="app.css?v=@CssVersion" />
+    <link rel="stylesheet" href="BlazorApp1.styles.css?v=@CssVersion" />
     <HeadOutlet />
 </head>
 <body>
@@ -30,3 +30,8 @@
     <script src="_framework/blazor.web.js"></script>
 </body>
 </html>
+
+@code {
+    // Bust cache cho css scoped khi them/sua page moi (vd: XuatKhoPage).
+    private static readonly string CssVersion = DateTime.UtcNow.Ticks.ToString();
+}

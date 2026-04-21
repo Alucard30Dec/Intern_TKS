@@ -3,6 +3,7 @@ using System;
 using BlazorApp1.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace BlazorApp1.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260420181849_AddNhapKhoHeaderEditForBai8")]
+    partial class AddNhapKhoHeaderEditForBai8
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -374,99 +377,6 @@ namespace BlazorApp1.Infrastructure.Data.Migrations
                     b.ToTable("tbl_DM_San_Pham", (string)null);
                 });
 
-            modelBuilder.Entity("BlazorApp1.Domain.Entities.XuatKho", b =>
-                {
-                    b.Property<int>("Xuat_Kho_ID")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasColumnName("Xuat_Kho_ID");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Xuat_Kho_ID"));
-
-                    b.Property<string>("Ghi_Chu")
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
-                        .HasColumnName("Ghi_Chu");
-
-                    b.Property<bool>("Is_Active")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true)
-                        .HasColumnName("Is_Active");
-
-                    b.Property<int>("Kho_ID")
-                        .HasColumnType("integer")
-                        .HasColumnName("Kho_ID");
-
-                    b.Property<DateTime>("Ngay_Xuat_Kho")
-                        .HasColumnType("date")
-                        .HasColumnName("Ngay_Xuat_Kho");
-
-                    b.Property<string>("So_Phieu_Xuat_Kho")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("So_Phieu_Xuat_Kho");
-
-                    b.HasKey("Xuat_Kho_ID");
-
-                    b.HasIndex("Kho_ID")
-                        .HasDatabaseName("IX_tbl_XNK_Xuat_Kho_Kho_ID");
-
-                    b.HasIndex("Ngay_Xuat_Kho")
-                        .HasDatabaseName("IX_tbl_XNK_Xuat_Kho_Ngay_Xuat_Kho");
-
-                    b.HasIndex("So_Phieu_Xuat_Kho")
-                        .IsUnique()
-                        .HasDatabaseName("UQ_tbl_XNK_Xuat_Kho_So_Phieu_Xuat_Kho");
-
-                    b.ToTable("tbl_XNK_Xuat_Kho", (string)null);
-                });
-
-            modelBuilder.Entity("BlazorApp1.Domain.Entities.XuatKhoRawData", b =>
-                {
-                    b.Property<int>("Xuat_Kho_Raw_Data_ID")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasColumnName("Xuat_Kho_Raw_Data_ID");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Xuat_Kho_Raw_Data_ID"));
-
-                    b.Property<decimal>("Don_Gia_Xuat")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("Don_Gia_Xuat");
-
-                    b.Property<bool>("Is_Active")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true)
-                        .HasColumnName("Is_Active");
-
-                    b.Property<decimal>("SL_Xuat")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("SL_Xuat");
-
-                    b.Property<int>("San_Pham_ID")
-                        .HasColumnType("integer")
-                        .HasColumnName("San_Pham_ID");
-
-                    b.Property<int>("Xuat_Kho_ID")
-                        .HasColumnType("integer")
-                        .HasColumnName("Xuat_Kho_ID");
-
-                    b.HasKey("Xuat_Kho_Raw_Data_ID");
-
-                    b.HasIndex("San_Pham_ID")
-                        .HasDatabaseName("IX_tbl_DM_Xuat_Kho_Raw_Data_San_Pham_ID");
-
-                    b.HasIndex("Xuat_Kho_ID")
-                        .HasDatabaseName("IX_tbl_DM_Xuat_Kho_Raw_Data_Xuat_Kho_ID");
-
-                    b.ToTable("tbl_DM_Xuat_Kho_Raw_Data", (string)null);
-                });
-
             modelBuilder.Entity("BlazorApp1.Domain.Entities.KhoUser", b =>
                 {
                     b.HasOne("BlazorApp1.Domain.Entities.Kho", "Kho")
@@ -542,47 +452,9 @@ namespace BlazorApp1.Infrastructure.Data.Migrations
                     b.Navigation("Loai_San_Pham");
                 });
 
-            modelBuilder.Entity("BlazorApp1.Domain.Entities.XuatKho", b =>
-                {
-                    b.HasOne("BlazorApp1.Domain.Entities.Kho", "Kho")
-                        .WithMany()
-                        .HasForeignKey("Kho_ID")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("FK_tbl_XNK_Xuat_Kho_tbl_DM_Kho_Kho_ID");
-
-                    b.Navigation("Kho");
-                });
-
-            modelBuilder.Entity("BlazorApp1.Domain.Entities.XuatKhoRawData", b =>
-                {
-                    b.HasOne("BlazorApp1.Domain.Entities.SanPham", "San_Pham")
-                        .WithMany()
-                        .HasForeignKey("San_Pham_ID")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("FK_tbl_DM_Xuat_Kho_Raw_Data_tbl_DM_San_Pham_San_Pham_ID");
-
-                    b.HasOne("BlazorApp1.Domain.Entities.XuatKho", "Xuat_Kho")
-                        .WithMany("Xuat_Kho_Raw_Datas")
-                        .HasForeignKey("Xuat_Kho_ID")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("FK_tbl_DM_Xuat_Kho_Raw_Data_tbl_XNK_Xuat_Kho_Xuat_Kho_ID");
-
-                    b.Navigation("San_Pham");
-
-                    b.Navigation("Xuat_Kho");
-                });
-
             modelBuilder.Entity("BlazorApp1.Domain.Entities.NhapKho", b =>
                 {
                     b.Navigation("Nhap_Kho_Raw_Datas");
-                });
-
-            modelBuilder.Entity("BlazorApp1.Domain.Entities.XuatKho", b =>
-                {
-                    b.Navigation("Xuat_Kho_Raw_Datas");
                 });
 #pragma warning restore 612, 618
         }

@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace BlazorApp1.Services;
 
 /// <summary>
-/// Xu ly nghiep vu bai 7: quan ly, them moi, xoa mem phieu nhap kho.
+/// Xu ly nghiep vu bai 7 den bai 10: quan ly, hieu chinh, in va xoa mem phieu nhap kho.
 /// </summary>
 public sealed class NhapKhoService : INhapKhoService
 {
@@ -105,6 +105,68 @@ public sealed class NhapKhoService : INhapKhoService
     }
 
     /// <summary>
+    /// Lay du lieu phuc vu in phieu nhap kho (bai 10).
+    /// </summary>
+    public async Task<ServiceResult<NhapKhoPrintVm>> GetPrintDataAsync(
+        int nhapKhoId,
+        CancellationToken cancellationToken = default)
+    {
+        if (nhapKhoId <= 0)
+        {
+            return ServiceResult<NhapKhoPrintVm>.Fail("ID phiếu nhập không hợp lệ.");
+        }
+
+        try
+        {
+            await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+            var header = await dbContext.NhapKhos
+                .AsNoTracking()
+                .Where(x => x.Nhap_Kho_ID == nhapKhoId && x.Is_Active)
+                .Select(x => new NhapKhoPrintVm
+                {
+                    Nhap_Kho_ID = x.Nhap_Kho_ID,
+                    So_Phieu_Nhap_Kho = x.So_Phieu_Nhap_Kho,
+                    Ngay_Nhap_Kho = x.Ngay_Nhap_Kho,
+                    Ten_Kho = x.Kho != null ? x.Kho.Ten_Kho : string.Empty,
+                    Ten_NCC = x.NCC != null ? x.NCC.Ten_NCC : string.Empty,
+                    Ghi_Chu = x.Ghi_Chu
+                })
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (header is null)
+            {
+                return ServiceResult<NhapKhoPrintVm>.Fail("Không tìm thấy phiếu nhập để in.");
+            }
+
+            var lines = await dbContext.NhapKhoRawDatas
+                .AsNoTracking()
+                .Where(x => x.Nhap_Kho_ID == nhapKhoId && x.Is_Active)
+                .OrderBy(x => x.Nhap_Kho_Raw_Data_ID)
+                .Select(x => new NhapKhoPrintLineVm
+                {
+                    Ma_San_Pham = x.San_Pham != null ? x.San_Pham.Ma_San_Pham : string.Empty,
+                    Ten_San_Pham = x.San_Pham != null ? x.San_Pham.Ten_San_Pham : string.Empty,
+                    Ten_Don_Vi_Tinh = x.San_Pham != null && x.San_Pham.Don_Vi_Tinh != null
+                        ? x.San_Pham.Don_Vi_Tinh.Ten_Don_Vi_Tinh
+                        : string.Empty,
+                    SL_Nhap = x.SL_Nhap,
+                    Don_Gia_Nhap = x.Don_Gia_Nhap
+                })
+                .ToListAsync(cancellationToken);
+
+            header.Lines = lines;
+
+            return ServiceResult<NhapKhoPrintVm>.Ok(header);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Get NhapKho print data failed. Nhap_Kho_ID={Nhap_Kho_ID}", nhapKhoId);
+            return ServiceResult<NhapKhoPrintVm>.Fail("Không thể tải dữ liệu in phiếu nhập kho.");
+        }
+    }
+
+    /// <summary>
     /// Tao moi phieu nhap kho va chi tiet.
     /// </summary>
     public async Task<ServiceResult> CreateAsync(NhapKhoCreateVm model, CancellationToken cancellationToken = default)
@@ -189,16 +251,16 @@ public sealed class NhapKhoService : INhapKhoService
     }
 
     /// <summary>
-    /// Cap nhat phieu nhap kho va thay moi danh sach chi tiet dang hoat dong.
+    /// Hieu chinh thong tin phieu nhap kho (phan header - bai 8).
     /// </summary>
-    public async Task<ServiceResult> UpdateAsync(NhapKhoCreateVm model, CancellationToken cancellationToken = default)
+    public async Task<ServiceResult> UpdateHeaderAsync(NhapKhoCreateVm model, CancellationToken cancellationToken = default)
     {
         if (model.Nhap_Kho_ID <= 0)
         {
             return ServiceResult.Fail("ID phiếu nhập không hợp lệ.");
         }
 
-        var validation = ValidateBusinessRules(model);
+        var validation = ValidateHeaderRules(model);
         if (!validation.Success)
         {
             return validation;
@@ -206,14 +268,12 @@ public sealed class NhapKhoService : INhapKhoService
 
         var normalizedSoPhieu = NormalizeCode(model.So_Phieu_Nhap_Kho);
         var normalizedGhiChu = NormalizeNullableText(model.Ghi_Chu);
-        var normalizedDetails = NormalizeDetails(model.Chi_Tiets);
 
         try
         {
             await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
             var entity = await dbContext.NhapKhos
-                .Include(x => x.Nhap_Kho_Raw_Datas)
                 .FirstOrDefaultAsync(
                     x => x.Nhap_Kho_ID == model.Nhap_Kho_ID && x.Is_Active,
                     cancellationToken);
@@ -241,54 +301,218 @@ public sealed class NhapKhoService : INhapKhoService
                 return ServiceResult.Fail("Nhà cung cấp không tồn tại hoặc đã ngưng sử dụng.");
             }
 
-            var productIds = normalizedDetails
-                .Select(x => x.San_Pham_ID)
-                .Distinct()
-                .ToList();
-
-            var availableProductCount = await dbContext.SanPhams.CountAsync(
-                x => x.Is_Active && productIds.Contains(x.San_Pham_ID),
-                cancellationToken);
-            if (availableProductCount != productIds.Count)
-            {
-                return ServiceResult.Fail("Một hoặc nhiều sản phẩm không tồn tại hoặc đã ngưng sử dụng.");
-            }
-
             entity.So_Phieu_Nhap_Kho = normalizedSoPhieu;
             entity.Kho_ID = model.Kho_ID;
             entity.NCC_ID = model.NCC_ID;
             entity.Ngay_Nhap_Kho = model.Ngay_Nhap_Kho.Date;
             entity.Ghi_Chu = normalizedGhiChu;
 
-            foreach (var oldLine in entity.Nhap_Kho_Raw_Datas.Where(x => x.Is_Active))
-            {
-                oldLine.Is_Active = false;
-            }
-
-            foreach (var line in normalizedDetails)
-            {
-                entity.Nhap_Kho_Raw_Datas.Add(new NhapKhoRawData
-                {
-                    Nhap_Kho_ID = entity.Nhap_Kho_ID,
-                    San_Pham_ID = line.San_Pham_ID,
-                    SL_Nhap = line.SL_Nhap,
-                    Don_Gia_Nhap = line.Don_Gia_Nhap,
-                    Is_Active = true
-                });
-            }
-
             await dbContext.SaveChangesAsync(cancellationToken);
-            return ServiceResult.Ok("Cập nhật phiếu nhập kho thành công.");
+            return ServiceResult.Ok("Hiệu chỉnh thông tin phiếu nhập kho thành công.");
         }
         catch (DbUpdateException ex)
         {
-            _logger.LogError(ex, "Update NhapKho failed. Nhap_Kho_ID={Nhap_Kho_ID}", model.Nhap_Kho_ID);
-            return ServiceResult.Fail("Không thể cập nhật phiếu nhập kho. Có thể dữ liệu đã bị trùng.");
+            _logger.LogError(ex, "Update NhapKho header failed. Nhap_Kho_ID={Nhap_Kho_ID}", model.Nhap_Kho_ID);
+            return ServiceResult.Fail("Không thể hiệu chỉnh thông tin phiếu nhập. Có thể dữ liệu đã bị trùng.");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error while updating NhapKho. Nhap_Kho_ID={Nhap_Kho_ID}", model.Nhap_Kho_ID);
-            return ServiceResult.Fail("Không thể cập nhật phiếu nhập kho do lỗi hệ thống.");
+            _logger.LogError(ex, "Unexpected error while updating NhapKho header. Nhap_Kho_ID={Nhap_Kho_ID}", model.Nhap_Kho_ID);
+            return ServiceResult.Fail("Không thể hiệu chỉnh thông tin phiếu nhập do lỗi hệ thống.");
+        }
+    }
+
+    /// <summary>
+    /// Them moi dong chi tiet cho phieu nhap kho (bai 9).
+    /// </summary>
+    public async Task<ServiceResult> AddDetailAsync(
+        int nhapKhoId,
+        NhapKhoDetailCreateVm model,
+        CancellationToken cancellationToken = default)
+    {
+        if (nhapKhoId <= 0)
+        {
+            return ServiceResult.Fail("ID phiếu nhập không hợp lệ.");
+        }
+
+        if (model is null)
+        {
+            return ServiceResult.Fail("Dữ liệu dòng chi tiết không hợp lệ.");
+        }
+
+        if (model.San_Pham_ID <= 0)
+        {
+            return ServiceResult.Fail("Mã sản phẩm không được để trống.");
+        }
+
+        if (model.SL_Nhap <= 0)
+        {
+            return ServiceResult.Fail("Số lượng nhập phải lớn hơn 0.");
+        }
+
+        if (model.Don_Gia_Nhap <= 0)
+        {
+            return ServiceResult.Fail("Đơn giá nhập phải lớn hơn 0.");
+        }
+
+        try
+        {
+            await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+            var headerExists = await dbContext.NhapKhos.AnyAsync(
+                x => x.Nhap_Kho_ID == nhapKhoId && x.Is_Active,
+                cancellationToken);
+            if (!headerExists)
+            {
+                return ServiceResult.Fail("Không tìm thấy phiếu nhập kho.");
+            }
+
+            var productExists = await dbContext.SanPhams.AnyAsync(
+                x => x.San_Pham_ID == model.San_Pham_ID && x.Is_Active,
+                cancellationToken);
+            if (!productExists)
+            {
+                return ServiceResult.Fail("Sản phẩm không tồn tại hoặc đã ngưng sử dụng.");
+            }
+
+            var duplicatedProduct = await dbContext.NhapKhoRawDatas.AnyAsync(
+                x => x.Nhap_Kho_ID == nhapKhoId
+                    && x.San_Pham_ID == model.San_Pham_ID
+                    && x.Is_Active,
+                cancellationToken);
+            if (duplicatedProduct)
+            {
+                return ServiceResult.Fail("Sản phẩm đã tồn tại trong phiếu nhập. Vui lòng sửa dòng hiện có.");
+            }
+
+            dbContext.NhapKhoRawDatas.Add(new NhapKhoRawData
+            {
+                Nhap_Kho_ID = nhapKhoId,
+                San_Pham_ID = model.San_Pham_ID,
+                SL_Nhap = decimal.Round(model.SL_Nhap, 2, MidpointRounding.AwayFromZero),
+                Don_Gia_Nhap = decimal.Round(model.Don_Gia_Nhap, 2, MidpointRounding.AwayFromZero),
+                Is_Active = true
+            });
+
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return ServiceResult.Ok("Thêm dòng chi tiết thành công.");
+        }
+        catch (DbUpdateException ex)
+        {
+            _logger.LogError(ex, "Add NhapKho detail failed. Nhap_Kho_ID={Nhap_Kho_ID}", nhapKhoId);
+            return ServiceResult.Fail("Không thể thêm dòng chi tiết do ràng buộc dữ liệu.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error while adding NhapKho detail. Nhap_Kho_ID={Nhap_Kho_ID}", nhapKhoId);
+            return ServiceResult.Fail("Không thể thêm dòng chi tiết do lỗi hệ thống.");
+        }
+    }
+
+    /// <summary>
+    /// Cap nhat chi tiet phieu nhap (chi sua so luong, don gia - bai 9).
+    /// </summary>
+    public async Task<ServiceResult> UpdateDetailAsync(
+        NhapKhoDetailUpdateVm model,
+        CancellationToken cancellationToken = default)
+    {
+        if (model is null || model.Nhap_Kho_Raw_Data_ID <= 0)
+        {
+            return ServiceResult.Fail("ID dòng chi tiết không hợp lệ.");
+        }
+
+        if (model.SL_Nhap <= 0)
+        {
+            return ServiceResult.Fail("Số lượng nhập phải lớn hơn 0.");
+        }
+
+        if (model.Don_Gia_Nhap <= 0)
+        {
+            return ServiceResult.Fail("Đơn giá nhập phải lớn hơn 0.");
+        }
+
+        try
+        {
+            await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+            var line = await dbContext.NhapKhoRawDatas
+                .Include(x => x.Nhap_Kho)
+                .FirstOrDefaultAsync(
+                    x => x.Nhap_Kho_Raw_Data_ID == model.Nhap_Kho_Raw_Data_ID && x.Is_Active,
+                    cancellationToken);
+
+            if (line is null)
+            {
+                return ServiceResult.Fail("Không tìm thấy dòng chi tiết để cập nhật.");
+            }
+
+            if (line.Nhap_Kho is null || !line.Nhap_Kho.Is_Active)
+            {
+                return ServiceResult.Fail("Không thể cập nhật vì phiếu nhập đã bị ngưng sử dụng.");
+            }
+
+            line.SL_Nhap = decimal.Round(model.SL_Nhap, 2, MidpointRounding.AwayFromZero);
+            line.Don_Gia_Nhap = decimal.Round(model.Don_Gia_Nhap, 2, MidpointRounding.AwayFromZero);
+
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return ServiceResult.Ok("Cập nhật dòng chi tiết thành công.");
+        }
+        catch (DbUpdateException ex)
+        {
+            _logger.LogError(ex, "Update NhapKho detail failed. Nhap_Kho_Raw_Data_ID={Nhap_Kho_Raw_Data_ID}", model.Nhap_Kho_Raw_Data_ID);
+            return ServiceResult.Fail("Không thể cập nhật dòng chi tiết do ràng buộc dữ liệu.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error while updating NhapKho detail. Nhap_Kho_Raw_Data_ID={Nhap_Kho_Raw_Data_ID}", model.Nhap_Kho_Raw_Data_ID);
+            return ServiceResult.Fail("Không thể cập nhật dòng chi tiết do lỗi hệ thống.");
+        }
+    }
+
+    /// <summary>
+    /// Xoa mem dong chi tiet phieu nhap kho (bai 9).
+    /// </summary>
+    public async Task<ServiceResult> DeleteDetailAsync(int nhapKhoRawDataId, CancellationToken cancellationToken = default)
+    {
+        if (nhapKhoRawDataId <= 0)
+        {
+            return ServiceResult.Fail("ID dòng chi tiết không hợp lệ.");
+        }
+
+        try
+        {
+            await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+            var line = await dbContext.NhapKhoRawDatas
+                .Include(x => x.Nhap_Kho)
+                .FirstOrDefaultAsync(
+                    x => x.Nhap_Kho_Raw_Data_ID == nhapKhoRawDataId && x.Is_Active,
+                    cancellationToken);
+
+            if (line is null)
+            {
+                return ServiceResult.Fail("Không tìm thấy dòng chi tiết để xóa.");
+            }
+
+            if (line.Nhap_Kho is null || !line.Nhap_Kho.Is_Active)
+            {
+                return ServiceResult.Fail("Không thể xóa vì phiếu nhập đã bị ngưng sử dụng.");
+            }
+
+            line.Is_Active = false;
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            return ServiceResult.Ok("Đã xóa dòng chi tiết khỏi danh sách hiển thị.");
+        }
+        catch (DbUpdateException ex)
+        {
+            _logger.LogError(ex, "Delete NhapKho detail failed. Nhap_Kho_Raw_Data_ID={Nhap_Kho_Raw_Data_ID}", nhapKhoRawDataId);
+            return ServiceResult.Fail("Không thể xóa dòng chi tiết do ràng buộc dữ liệu.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error while deleting NhapKho detail. Nhap_Kho_Raw_Data_ID={Nhap_Kho_Raw_Data_ID}", nhapKhoRawDataId);
+            return ServiceResult.Fail("Không thể xóa dòng chi tiết do lỗi hệ thống.");
         }
     }
 
@@ -410,6 +634,48 @@ public sealed class NhapKhoService : INhapKhoService
             {
                 return ServiceResult.Fail($"Dòng {lineNo}: Đơn giá nhập phải lớn hơn 0.");
             }
+        }
+
+        return ServiceResult.Ok();
+    }
+
+    private static ServiceResult ValidateHeaderRules(NhapKhoCreateVm model)
+    {
+        if (model is null)
+        {
+            return ServiceResult.Fail("Dữ liệu không hợp lệ.");
+        }
+
+        var normalizedSoPhieu = NormalizeCode(model.So_Phieu_Nhap_Kho);
+        if (string.IsNullOrWhiteSpace(normalizedSoPhieu))
+        {
+            return ServiceResult.Fail("Số phiếu nhập không được để trống.");
+        }
+
+        if (normalizedSoPhieu.Length > 50)
+        {
+            return ServiceResult.Fail("Số phiếu nhập tối đa 50 ký tự.");
+        }
+
+        if (model.Kho_ID <= 0)
+        {
+            return ServiceResult.Fail("Kho không được để trống.");
+        }
+
+        if (model.NCC_ID <= 0)
+        {
+            return ServiceResult.Fail("Nhà cung cấp không được để trống.");
+        }
+
+        if (model.Ngay_Nhap_Kho == default)
+        {
+            return ServiceResult.Fail("Ngày nhập kho không được để trống.");
+        }
+
+        var ghiChu = NormalizeNullableText(model.Ghi_Chu);
+        if (ghiChu is not null && ghiChu.Length > 255)
+        {
+            return ServiceResult.Fail("Ghi chú tối đa 255 ký tự.");
         }
 
         return ServiceResult.Ok();
