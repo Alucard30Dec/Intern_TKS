@@ -1,6 +1,8 @@
 @page "/nhap-kho"
 @rendermode InteractiveServer
+@implements IDisposable
 @using System.Globalization
+@using BlazorApp1.Infrastructure.Excel
 @using BlazorApp1.Models.Kho
 @using BlazorApp1.Models.Common
 @using BlazorApp1.Models.NhaCungCap
@@ -8,9 +10,9 @@
 @using BlazorApp1.Models.SanPham
 @using BlazorApp1.Services.Interfaces
 @inject INhapKhoService NhapKhoService
-@inject IKhoService KhoService
 @inject INhaCungCapService NhaCungCapService
 @inject ISanPhamService SanPhamService
+@inject IAppSelectionContextService AppSelectionContext
 @inject IJSRuntime JS
 @inject ILogger<NhapKhoPage> Logger
 
@@ -23,9 +25,32 @@
 
     <header class="page-header">
         <h1>Quản lý phiếu nhập kho</h1>
-        <button type="button" class="app-button app-button--primary" @onclick="StartCreate" disabled="@isSaving">
-            Thêm phiếu nhập
-        </button>
+        <div class="page-header__actions">
+            <button type="button" class="app-button" style="display:inline-flex;align-items:center;justify-content:center;gap:0.42rem;box-sizing:border-box;width:150px;min-width:150px;max-width:150px;white-space:nowrap;background:#ffffff;border:1px solid #6dc7bf;color:#0f8b84;" @onclick="ExportTemplateAsync" disabled="@(isSaving || isImporting || isApplyingImport)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 3v12" />
+                    <path d="m7 10 5 5 5-5" />
+                    <path d="M5 21h14" />
+                </svg>
+                <span>Xuất file mẫu</span>
+            </button>
+            <label class="app-button" style="position:relative;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;gap:0.42rem;box-sizing:border-box;width:150px;min-width:150px;max-width:150px;white-space:nowrap;background:#ffffff;border:1px solid #6dc7bf;color:#0f8b84;@(isSaving || isImporting || isApplyingImport ? "pointer-events:none;opacity:0.65;cursor:wait;" : "cursor:pointer;")">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 21V9" />
+                    <path d="m17 14-5-5-5 5" />
+                    <path d="M5 3h14" />
+                </svg>
+                <span>Nhập file excel</span>
+                <InputFile style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;"
+                           @key="importFileInputVersion"
+                           OnChange="ImportExcelAsync"
+                           accept=".xlsx"
+                           disabled="@(isSaving || isImporting || isApplyingImport)" />
+            </label>
+            <button type="button" class="app-button app-button--primary" @onclick="StartCreate" disabled="@(isSaving || isImporting || isApplyingImport)">
+                Thêm phiếu nhập
+            </button>
+        </div>
     </header>
 
     @if (!string.IsNullOrWhiteSpace(pageMessage))
@@ -34,6 +59,15 @@
             @pageMessage
         </div>
     }
+
+    <ExcelImportPreviewDialog Visible="@showImportPreview"
+                              FileName="@importPreviewFileName"
+                              SheetName="@importPreviewSheetName"
+                              ColumnHeaders="@ImportPreviewHeaders"
+                              Rows="@importPreviewRows"
+                              IsApplying="@isApplyingImport"
+                              OnClose="CloseImportPreview"
+                              OnConfirm="ApplyImportAsync" />
 
     <div class="import-layout import-layout--single">
         <section class="card card--list">
@@ -700,6 +734,14 @@
     private NhapKhoListItemVm? detailHeaderItem;
     private bool isLoading = true;
     private bool isSaving;
+    private bool isImporting;
+    private bool isApplyingImport;
+    private int importFileInputVersion;
+    private bool showImportPreview;
+    private string importPreviewFileName = string.Empty;
+    private string importPreviewSheetName = string.Empty;
+    private List<ExcelImportPreviewRow> importPreviewRows = [];
+    private List<ExcelImportRow> importSourceRows = [];
     private bool isDetailLoading;
     private bool isDetailEditorLoading;
     private bool isDetailEditorVisible;
@@ -717,6 +759,26 @@
     private bool detailEditorMessageIsError;
     private string searchKeyword = string.Empty;
     private string ngayNhapKhoText = string.Empty;
+    private const string ImportHeaderSoPhieuNhap = "Số phiếu nhập";
+    private const string ImportHeaderNgayNhapKho = "Ngày nhập kho";
+    private const string ImportHeaderNhaCungCap = "Nhà cung cấp";
+    private const string ImportHeaderSanPham = "Sản phẩm";
+    private const string ImportHeaderSoLuongNhap = "Số lượng nhập";
+    private const string ImportHeaderDonGiaNhap = "Đơn giá nhập";
+    private const string ImportHeaderDonViTien = "Đơn vị tiền";
+    private const string ImportHeaderGhiChu = "Ghi chú";
+
+    private static readonly IReadOnlyList<string> ImportPreviewHeaders =
+    [
+        ImportHeaderSoPhieuNhap,
+        ImportHeaderNgayNhapKho,
+        ImportHeaderNhaCungCap,
+        ImportHeaderSanPham,
+        ImportHeaderSoLuongNhap,
+        ImportHeaderDonGiaNhap,
+        ImportHeaderDonViTien,
+        ImportHeaderGhiChu
+    ];
     private IReadOnlyList<string> SupportedCurrencies => DonViTienOptions.SupportedValues;
     private string CurrentDetailEditorDonViTien => DonViTienOptions.Normalize(detailHeaderItem?.Don_Vi_Tien);
     private string SelectedDonViTien =>
@@ -748,7 +810,14 @@
 
     protected override async Task OnInitializedAsync()
     {
+        AppSelectionContext.SelectionChanged += HandleSelectionChanged;
+        await AppSelectionContext.EnsureInitializedAsync();
         await LoadDataAsync();
+    }
+
+    public void Dispose()
+    {
+        AppSelectionContext.SelectionChanged -= HandleSelectionChanged;
     }
 
     private async Task LoadDataAsync()
@@ -759,18 +828,18 @@
             ClearPageMessage();
             ClearFormMessage();
 
-            var getNhapKhoTask = NhapKhoService.GetAllAsync();
-            var getKhoTask = KhoService.GetAllAsync();
+            var selectedKhoId = AppSelectionContext.SelectedKhoId;
+            var getNhapKhoTask = NhapKhoService.GetAllAsync(selectedKhoId);
             var getNhaCungCapTask = NhaCungCapService.GetAllAsync();
             var getSanPhamTask = SanPhamService.GetAllAsync();
 
-            await Task.WhenAll(getNhapKhoTask, getKhoTask, getNhaCungCapTask, getSanPhamTask);
+            await Task.WhenAll(getNhapKhoTask, getNhaCungCapTask, getSanPhamTask);
 
             items.Clear();
             items.AddRange(getNhapKhoTask.Result);
 
             khoOptions.Clear();
-            khoOptions.AddRange(getKhoTask.Result);
+            khoOptions.AddRange(AppSelectionContext.KhoOptions);
 
             nhaCungCapOptions.Clear();
             nhaCungCapOptions.AddRange(getNhaCungCapTask.Result);
@@ -778,7 +847,12 @@
             sanPhamOptions.Clear();
             sanPhamOptions.AddRange(getSanPhamTask.Result);
 
-            if (!HasRequiredLookupData)
+            if (khoOptions.Count == 0)
+            {
+                pageMessage = "Tài khoản đang chọn chưa được phân quyền kho nào.";
+                pageMessageIsError = true;
+            }
+            else if (!HasRequiredLookupData)
             {
                 pageMessage = "Cần có dữ liệu Kho, Nhà cung cấp và Sản phẩm trước khi tạo phiếu nhập.";
                 pageMessageIsError = true;
@@ -850,14 +924,44 @@
 
     private void ResetFormModel()
     {
+        var defaultKhoId = AppSelectionContext.SelectedKhoId
+            ?? khoOptions.FirstOrDefault()?.Kho_ID
+            ?? 0;
+
         formModel = new NhapKhoCreateVm
         {
             Nhap_Kho_ID = 0,
+            Kho_ID = defaultKhoId,
             Ngay_Nhap_Kho = DateTime.Today,
             Don_Vi_Tien = DonViTienOptions.Vnd
         };
         ReformatFormLineValues();
         ngayNhapKhoText = formModel.Ngay_Nhap_Kho.ToString("dd/MM/yyyy");
+    }
+
+    private void HandleSelectionChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            await LoadDataAsync();
+
+            if (IsFormVisible && !isEditMode)
+            {
+                ApplySelectedKhoToForm();
+            }
+
+            StateHasChanged();
+        });
+    }
+
+    private void ApplySelectedKhoToForm()
+    {
+        if (!AppSelectionContext.SelectedKhoId.HasValue)
+        {
+            return;
+        }
+
+        formModel.Kho_ID = AppSelectionContext.SelectedKhoId.Value;
     }
 
     private async Task StartEditAsync(NhapKhoListItemVm item)
@@ -1513,6 +1617,471 @@
     {
         return !string.IsNullOrWhiteSpace(source)
                && source.Contains(keyword, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task ExportTemplateAsync()
+    {
+        try
+        {
+            var bytes = ExcelWorkbookHelper.CreateTemplate(
+                "NhapKho",
+                ImportPreviewHeaders,
+                []);
+
+            await DownloadExcelAsync("phieu-nhap-template.xlsx", bytes);
+            pageMessage = "Đã xuất file mẫu phiếu nhập.";
+            pageMessageIsError = false;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Export NhapKho template failed.");
+            pageMessage = "Không thể xuất file mẫu phiếu nhập.";
+            pageMessageIsError = true;
+        }
+    }
+
+    private async Task ImportExcelAsync(InputFileChangeEventArgs args)
+    {
+        var file = args.File;
+        if (file is null)
+        {
+            return;
+        }
+
+        if (!file.Name.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
+        {
+            pageMessage = "Chỉ hỗ trợ file Excel định dạng .xlsx.";
+            pageMessageIsError = true;
+            return;
+        }
+
+        var selectedKhoId = AppSelectionContext.SelectedKhoId;
+        if (!selectedKhoId.HasValue || selectedKhoId.Value <= 0)
+        {
+            pageMessage = "Vui lòng chọn kho trên header trước khi nhập file phiếu nhập.";
+            pageMessageIsError = true;
+            return;
+        }
+
+        isImporting = true;
+        ClearPageMessage();
+        ClearFormMessage();
+
+        try
+        {
+            await using var stream = file.OpenReadStream(15 * 1024 * 1024);
+            var readResult = await ExcelWorkbookHelper.ReadRowsWithContextAsync(stream);
+            var rows = readResult.Rows;
+            if (rows.Count == 0)
+            {
+                pageMessage = "File Excel không có dữ liệu để nhập.";
+                pageMessageIsError = true;
+                return;
+            }
+
+            var nccLookup = BuildNhaCungCapLookup();
+            var sanPhamLookup = BuildSanPhamLookup();
+
+            var existingSoPhieuSet = items
+                .Select(x => x.So_Phieu_Nhap_Kho?.Trim())
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(x => x!)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            importPreviewFileName = file.Name;
+            importPreviewSheetName = string.IsNullOrWhiteSpace(readResult.SheetName) ? "Sheet1" : readResult.SheetName;
+            importSourceRows = rows.ToList();
+            importPreviewRows = BuildImportPreviewRows(rows, nccLookup, sanPhamLookup, existingSoPhieuSet);
+            showImportPreview = true;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Import NhapKho from Excel failed.");
+            pageMessage = $"Không thể nhập file Excel phiếu nhập: {ex.Message}";
+            pageMessageIsError = true;
+        }
+        finally
+        {
+            isImporting = false;
+            importFileInputVersion++;
+        }
+    }
+
+    private async Task ApplyImportAsync()
+    {
+        var selectedKhoId = AppSelectionContext.SelectedKhoId;
+        if (!selectedKhoId.HasValue || selectedKhoId.Value <= 0)
+        {
+            pageMessage = "Vui lòng chọn kho trên header trước khi nhập file phiếu nhập.";
+            pageMessageIsError = true;
+            return;
+        }
+
+        var groups = importPreviewRows
+            .Select(x => new
+            {
+                Preview = x,
+                Row = x.SourceIndex >= 0 && x.SourceIndex < importSourceRows.Count ? importSourceRows[x.SourceIndex] : null
+            })
+            .Where(x => x.Row is not null)
+            .Select(x => new
+            {
+                x.Preview,
+                Row = x.Row!,
+                SoPhieu = GetImportCellValue(x.Row!, ImportHeaderSoPhieuNhap, "Số phiếu", "Số phiếu nhập kho").Trim()
+            })
+            .Where(x => !string.IsNullOrWhiteSpace(x.SoPhieu))
+            .GroupBy(x => x.SoPhieu, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (groups.Count == 0)
+        {
+            pageMessage = "Không đọc được cột 'Số phiếu nhập' hoặc dữ liệu số phiếu đang trống.";
+            pageMessageIsError = true;
+            return;
+        }
+
+        isApplyingImport = true;
+        ClearPageMessage();
+        ClearFormMessage();
+
+        try
+        {
+            var nccLookup = BuildNhaCungCapLookup();
+            var sanPhamLookup = BuildSanPhamLookup();
+
+            var successCount = 0;
+            var skippedDuplicates = new List<string>();
+            var errors = new List<string>();
+
+            foreach (var group in groups)
+            {
+                if (group.Any(x => x.Preview.Status == ExcelImportPreviewStatus.Error))
+                {
+                    errors.Add($"Phiếu {group.Key}: Có dòng dữ liệu không hợp lệ trong phần xem trước.");
+                    continue;
+                }
+
+                var first = group.First().Row;
+                var ngayNhapText = GetImportCellValue(first, ImportHeaderNgayNhapKho, "Ngày nhập").Trim();
+                if (!TryParseNgayNhapKhoFromExcel(ngayNhapText, out var ngayNhap))
+                {
+                    errors.Add($"Phiếu {group.Key}: Ngày nhập kho không hợp lệ (dòng {first.RowNumber}).");
+                    continue;
+                }
+
+                var nhaCungCapText = GetImportCellValue(first, ImportHeaderNhaCungCap, "Mã nhà cung cấp", "Mã NCC").Trim();
+                if (!nccLookup.TryGetValue(nhaCungCapText, out var ncc))
+                {
+                    errors.Add($"Phiếu {group.Key}: Không tìm thấy nhà cung cấp '{nhaCungCapText}'.");
+                    continue;
+                }
+
+                var donViTien = DonViTienOptions.Normalize(GetImportCellValue(first, ImportHeaderDonViTien).Trim());
+                if (string.IsNullOrWhiteSpace(donViTien))
+                {
+                    donViTien = DonViTienOptions.Vnd;
+                }
+
+                var chiTiets = new List<NhapKhoRawDataUpsertVm>();
+                var hasLineError = false;
+
+                foreach (var item in group.Where(x => x.Preview.CanImport))
+                {
+                    var sanPhamText = GetImportCellValue(item.Row, ImportHeaderSanPham, "Mã sản phẩm", "Mã SP").Trim();
+                    if (!sanPhamLookup.TryGetValue(sanPhamText, out var sanPham))
+                    {
+                        errors.Add($"Phiếu {group.Key}: Không tìm thấy sản phẩm '{sanPhamText}' (dòng {item.Row.RowNumber}).");
+                        hasLineError = true;
+                        continue;
+                    }
+
+                    if (!TryParsePositiveWholeNumber(GetImportCellValue(item.Row, ImportHeaderSoLuongNhap, "SL nhập"), out var soLuong))
+                    {
+                        errors.Add($"Phiếu {group.Key}: Số lượng nhập không hợp lệ (dòng {item.Row.RowNumber}).");
+                        hasLineError = true;
+                        continue;
+                    }
+
+                    if (!TryParsePositiveDecimal(GetImportCellValue(item.Row, ImportHeaderDonGiaNhap, "Đơn giá"), donViTien, out var donGia))
+                    {
+                        errors.Add($"Phiếu {group.Key}: Đơn giá nhập không hợp lệ (dòng {item.Row.RowNumber}).");
+                        hasLineError = true;
+                        continue;
+                    }
+
+                    chiTiets.Add(new NhapKhoRawDataUpsertVm
+                    {
+                        San_Pham_ID = sanPham.San_Pham_ID,
+                        SL_Nhap = soLuong,
+                        SL_Nhap_Text = FormatQuantityForInput(soLuong),
+                        Don_Gia_Nhap = donGia,
+                        Don_Gia_Nhap_Text = FormatAmountInput(donGia, donViTien)
+                    });
+                }
+
+                if (hasLineError || chiTiets.Count == 0)
+                {
+                    continue;
+                }
+
+                var result = await NhapKhoService.CreateAsync(new NhapKhoCreateVm
+                {
+                    So_Phieu_Nhap_Kho = group.Key,
+                    Kho_ID = selectedKhoId.Value,
+                    NCC_ID = ncc.NCC_ID,
+                    Ngay_Nhap_Kho = ngayNhap,
+                    Don_Vi_Tien = donViTien,
+                    Ghi_Chu = GetImportCellValue(first, ImportHeaderGhiChu).Trim(),
+                    Chi_Tiets = chiTiets
+                });
+
+                if (result.Success)
+                {
+                    successCount++;
+                }
+                else if (IsDuplicateImportMessage(result.Message))
+                {
+                    skippedDuplicates.Add($"Phiếu {group.Key}: {result.Message}");
+                }
+                else
+                {
+                    errors.Add($"Phiếu {group.Key}: {result.Message}");
+                }
+            }
+
+            await LoadDataAsync();
+            pageMessage = BuildImportSummary(successCount, skippedDuplicates, errors);
+            pageMessageIsError = errors.Count > 0;
+            CloseImportPreview();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Apply NhapKho import failed.");
+            pageMessage = $"Không thể nhập dữ liệu từ file Excel: {ex.Message}";
+            pageMessageIsError = true;
+        }
+        finally
+        {
+            isApplyingImport = false;
+        }
+    }
+
+    private void CloseImportPreview()
+    {
+        showImportPreview = false;
+        importPreviewFileName = string.Empty;
+        importPreviewSheetName = string.Empty;
+        importPreviewRows = [];
+        importSourceRows = [];
+    }
+
+    private List<ExcelImportPreviewRow> BuildImportPreviewRows(
+        IReadOnlyList<ExcelImportRow> rows,
+        IReadOnlyDictionary<string, NhaCungCapListItemVm> nccLookup,
+        IReadOnlyDictionary<string, SanPhamListItemVm> sanPhamLookup,
+        ISet<string> existingSoPhieuSet)
+    {
+        var previewRows = new List<ExcelImportPreviewRow>(rows.Count);
+
+        for (var index = 0; index < rows.Count; index++)
+        {
+            var row = rows[index];
+            var soPhieu = GetImportCellValue(row, ImportHeaderSoPhieuNhap, "Số phiếu", "Số phiếu nhập kho").Trim();
+            var ngayNhap = GetImportCellValue(row, ImportHeaderNgayNhapKho, "Ngày nhập").Trim();
+            var nhaCungCapText = GetImportCellValue(row, ImportHeaderNhaCungCap, "Mã nhà cung cấp", "Mã NCC").Trim();
+            var sanPhamText = GetImportCellValue(row, ImportHeaderSanPham, "Mã sản phẩm", "Mã SP").Trim();
+            var slNhap = GetImportCellValue(row, ImportHeaderSoLuongNhap, "SL nhập").Trim();
+            var donGiaNhap = GetImportCellValue(row, ImportHeaderDonGiaNhap, "Đơn giá").Trim();
+            var donViTien = DonViTienOptions.Normalize(GetImportCellValue(row, ImportHeaderDonViTien).Trim());
+            if (string.IsNullOrWhiteSpace(donViTien))
+            {
+                donViTien = DonViTienOptions.Vnd;
+            }
+
+            var ghiChu = GetImportCellValue(row, ImportHeaderGhiChu).Trim();
+            var status = ExcelImportPreviewStatus.Valid;
+            var message = string.Empty;
+
+            if (string.IsNullOrWhiteSpace(soPhieu))
+            {
+                status = ExcelImportPreviewStatus.Error;
+                message = "Thiếu số phiếu nhập.";
+            }
+            else if (!TryParseNgayNhapKhoFromExcel(ngayNhap, out _))
+            {
+                status = ExcelImportPreviewStatus.Error;
+                message = "Ngày nhập kho không hợp lệ.";
+            }
+            else if (!nccLookup.ContainsKey(nhaCungCapText))
+            {
+                status = ExcelImportPreviewStatus.Error;
+                message = $"Không tìm thấy nhà cung cấp '{nhaCungCapText}'.";
+            }
+            else if (!sanPhamLookup.ContainsKey(sanPhamText))
+            {
+                status = ExcelImportPreviewStatus.Error;
+                message = $"Không tìm thấy sản phẩm '{sanPhamText}'.";
+            }
+            else if (!TryParsePositiveWholeNumber(slNhap, out _))
+            {
+                status = ExcelImportPreviewStatus.Error;
+                message = "Số lượng nhập không hợp lệ.";
+            }
+            else if (!TryParsePositiveDecimal(donGiaNhap, donViTien, out _))
+            {
+                status = ExcelImportPreviewStatus.Error;
+                message = "Đơn giá nhập không hợp lệ.";
+            }
+            else if (existingSoPhieuSet.Contains(soPhieu))
+            {
+                status = ExcelImportPreviewStatus.Warning;
+                message = $"Số phiếu '{soPhieu}' đã tồn tại.";
+            }
+
+            previewRows.Add(new ExcelImportPreviewRow(
+                DisplayIndex: index + 1,
+                SourceIndex: index,
+                ExcelRowNumber: row.RowNumber,
+                Cells: [soPhieu, ngayNhap, nhaCungCapText, sanPhamText, slNhap, donGiaNhap, donViTien, ghiChu],
+                Status: status,
+                Message: message));
+        }
+
+        return previewRows;
+    }
+
+    private IReadOnlyDictionary<string, NhaCungCapListItemVm> BuildNhaCungCapLookup()
+    {
+        var lookup = new Dictionary<string, NhaCungCapListItemVm>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var item in nhaCungCapOptions)
+        {
+            AddLookupEntry(lookup, item.Ma_NCC, item);
+            AddLookupEntry(lookup, item.Ten_NCC, item);
+        }
+
+        return lookup;
+    }
+
+    private IReadOnlyDictionary<string, SanPhamListItemVm> BuildSanPhamLookup()
+    {
+        var lookup = new Dictionary<string, SanPhamListItemVm>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var item in sanPhamOptions)
+        {
+            AddLookupEntry(lookup, item.Ma_San_Pham, item);
+            AddLookupEntry(lookup, item.Ten_San_Pham, item);
+        }
+
+        return lookup;
+    }
+
+    private static void AddLookupEntry<TValue>(
+        IDictionary<string, TValue> lookup,
+        string? key,
+        TValue value)
+    {
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            return;
+        }
+
+        var normalized = key.Trim();
+        if (!lookup.ContainsKey(normalized))
+        {
+            lookup[normalized] = value;
+        }
+    }
+
+    private static string GetImportCellValue(ExcelImportRow row, params string[] headers)
+    {
+        foreach (var header in headers)
+        {
+            var value = row.Get(header);
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                return value;
+            }
+        }
+
+        return headers.Length > 0 ? row.Get(headers[0]) : string.Empty;
+    }
+
+    private static bool TryParseNgayNhapKhoFromExcel(string? value, out DateTime parsedDate)
+    {
+        parsedDate = default;
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        var text = value.Trim();
+        return DateTime.TryParseExact(
+                   text,
+                   ["dd/MM/yyyy", "d/M/yyyy", "yyyy-MM-dd"],
+                   CultureInfo.InvariantCulture,
+                   DateTimeStyles.None,
+                   out parsedDate)
+               || DateTime.TryParse(text, CultureInfo.GetCultureInfo("vi-VN"), DateTimeStyles.None, out parsedDate)
+               || DateTime.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.None, out parsedDate);
+    }
+
+    private async Task DownloadExcelAsync(string fileName, byte[] bytes)
+    {
+        await JS.InvokeVoidAsync(
+            "blazorFileDownload.downloadFileFromBase64",
+            fileName,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            Convert.ToBase64String(bytes));
+    }
+
+    private static bool IsDuplicateImportMessage(string? message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return false;
+        }
+
+        return message.Contains("đã tồn tại", StringComparison.OrdinalIgnoreCase)
+               || message.Contains("bị trùng", StringComparison.OrdinalIgnoreCase)
+               || message.Contains("đã được", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string BuildImportSummary(
+        int successCount,
+        IReadOnlyList<string> skippedDuplicates,
+        IReadOnlyList<string> errors)
+    {
+        if (errors.Count == 0 && skippedDuplicates.Count == 0)
+        {
+            return $"Nhập Excel thành công {successCount} phiếu.";
+        }
+
+        if (errors.Count == 0 && skippedDuplicates.Count > 0)
+        {
+            var skippedText = string.Join(" | ", skippedDuplicates.Take(3));
+            if (skippedDuplicates.Count > 3)
+            {
+                skippedText += $" | ... thêm {skippedDuplicates.Count - 3} phiếu trùng.";
+            }
+
+            return $"Đã nhập {successCount} phiếu. Bỏ qua {skippedDuplicates.Count} phiếu trùng: {skippedText}";
+        }
+
+        var firstErrors = string.Join(" | ", errors.Take(3));
+        if (errors.Count > 3)
+        {
+            firstErrors += $" | ... thêm {errors.Count - 3} lỗi.";
+        }
+
+        var summary = $"Đã nhập {successCount} phiếu. Có {errors.Count} lỗi: {firstErrors}";
+        if (skippedDuplicates.Count > 0)
+        {
+            summary += $" | Bỏ qua {skippedDuplicates.Count} phiếu trùng.";
+        }
+
+        return summary;
     }
 
     private static bool TryParseNgayNhapKhoText(string value, out DateTime parsedDate)

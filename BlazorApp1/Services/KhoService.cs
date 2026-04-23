@@ -98,21 +98,38 @@ public sealed class KhoService : IKhoService
         }
 
         var normalizedName = NormalizeName(model.Ten_Kho);
+        var normalizedGhiChu = NormalizeNullableText(model.Ghi_Chu);
+        var compareValue = normalizedName.ToUpper();
 
         try
         {
             await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-            var duplicated = await ExistsByNameAsync(dbContext, normalizedName, null, cancellationToken);
-            if (duplicated)
+            var activeDuplicated = await dbContext.Khos.AnyAsync(
+                x => x.Is_Active && x.Ten_Kho.ToUpper() == compareValue,
+                cancellationToken);
+            if (activeDuplicated)
             {
                 return ServiceResult.Fail("Tên kho đã tồn tại.");
+            }
+
+            var inactiveRecord = await dbContext.Khos.FirstOrDefaultAsync(
+                x => !x.Is_Active && x.Ten_Kho.ToUpper() == compareValue,
+                cancellationToken);
+            if (inactiveRecord is not null)
+            {
+                inactiveRecord.Is_Active = true;
+                inactiveRecord.Ten_Kho = normalizedName;
+                inactiveRecord.Ghi_Chu = normalizedGhiChu;
+
+                await dbContext.SaveChangesAsync(cancellationToken);
+                return ServiceResult.Ok("Khôi phục kho thành công.");
             }
 
             var entity = new Kho
             {
                 Ten_Kho = normalizedName,
-                Ghi_Chu = NormalizeNullableText(model.Ghi_Chu),
+                Ghi_Chu = normalizedGhiChu,
                 Is_Active = true
             };
 

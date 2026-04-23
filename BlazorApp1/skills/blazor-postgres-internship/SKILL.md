@@ -37,6 +37,97 @@ Read [`references/project-runbook.md`](references/project-runbook.md) when you n
 5. Verify after each meaningful batch.
 6. Report changed files, commands run, and remaining risks.
 
+## Code-Change Guardrails (Mandatory)
+
+Apply these defaults for all Blazor / C# / .NET tasks in this repo.
+
+1. Fix correct business behavior first; keep scope tight and controllable.
+2. Prefer focused, low-risk changes; keep unrelated behavior unchanged.
+3. Do not patch temporarily, do not refactor lan man, do not generic hóa sớm.
+4. "Minimal change" means minimal business scope and risk, not "fewest lines at any cost".
+5. Cleanup nhỏ is allowed only inside touched area when it is directly related, low risk, and clearly improves readability/testability.
+6. Allowed cleanup in touched area:
+   - rename unclear local symbols
+   - split a long method into small focused methods
+   - remove small local duplication
+   - add missing validation/error message clarity
+   - remove dead code in the same area
+7. Disallowed in small fixes:
+   - architecture-level refactor
+   - wide rename across unrelated modules
+   - new abstractions/generic layers without stable pattern
+8. Every change must serve at least one goal:
+   - bug fix
+   - business-rule clarity
+   - maintainability risk reduction
+   - testability improvement
+   - readability improvement
+
+## Naming Consistency (Mandatory)
+
+1. One business concept must use one canonical name across entity/DTO/service/component/route/print model.
+2. C# naming rules:
+   - PascalCase: class, record, enum, method, public property
+   - camelCase: parameter, local variable
+   - `_camelCase`: private field
+   - interface starts with `I`
+3. Prefer clear names over short names.
+4. Avoid vague names (`data`, `info`, `item`, `manager`, `common`) unless role is explicit.
+5. Keep DB schema names exactly as spec; map them explicitly in EF Core (`ToTable`, `HasColumnName`) instead of forcing underscore naming into C# public properties.
+
+## Readability, Reuse, And Refactor Rules
+
+1. Readability/maintainability > cleverness.
+2. Keep business rules in service/domain; UI only orchestrates interaction state and event flow.
+3. Reuse only when logic has same business nature and changes together over time.
+4. If duplication is still small and pattern is unclear, keep explicit code; avoid wrong abstraction.
+5. If an abstraction requires many type flags/if-switch branches, prefer simpler design.
+
+## Pre-Edit Decision Gate (Mandatory)
+
+Before editing, check:
+
+1. What exact business outcome must change?
+2. Which files/functions are truly required?
+3. Is cleanup needed so touched code does not become harder to maintain?
+4. Does cleanup increase review/test/rollback risk?
+
+Do cleanup in same patch only when: direct + low risk + clearly improves readability.
+Otherwise, split into a separate task.
+
+## Hotfix Rules (Production-Sensitive)
+
+1. For hotfix/critical bugs, minimize behavior change surface.
+2. Avoid large refactor in same patch.
+3. Keep rollback/test/review easy.
+4. Only allow tiny, safe cleanup.
+
+## Comment Rules When Editing
+
+1. Do not comment what code already says.
+2. Comment only for: why, business rule, assumption, edge case, workaround, technical debt.
+3. Prefer better naming/extraction over explanatory noise comments.
+
+## Quick Review Checklist: "Sửa Code Đúng Chuẩn"
+
+1. Scope focused to requested behavior.
+2. No unrelated module changes.
+3. Naming consistent with project terms and C# conventions.
+4. No temporary patch / no early over-abstraction.
+5. Touched code is clearer than before.
+6. Validation/error messages are explicit enough for business/debug flow.
+7. Build passes; key flow manually testable.
+8. Patch is reviewable and rollback-friendly.
+
+## Decision Matrix: Focused Fix vs Cleanup
+
+- Bugfix nhỏ, code vẫn rõ -> focused fix only.
+- Bugfix nhỏ, vùng code rối -> focused fix + small local cleanup.
+- Medium business change -> allow moderate refactor only to keep code clear/testable.
+- Production hotfix -> behavior-minimal patch, cleanup cực hạn chế.
+- Reuse/generic idea but pattern chưa ổn -> keep explicit code for now.
+- Small duplication but current code still clear -> duplication can stay.
+
 ## Respect Existing Architecture
 
 - Keep current layer boundaries:
@@ -205,24 +296,16 @@ Required reuse checklist:
 5. For startup schema readiness, preserve existing initialization flow in `Program.cs`.
 6. For auth errors (`28P01`), surface clear actionable messages and keep stack trace.
 
-## Naming Alignment With Internship Spec (Mandatory)
+## DB Schema Alignment With Internship Spec (Mandatory)
 
-When the task references `Bai Tap Thuc Tap.docx`, treat document naming as source of truth for both DB schema and code property names.
+When task references `Bai Tap Thuc Tap.docx`, treat DB schema naming in the document as source of truth.
 
-1. Keep table names exactly as documented (case and underscore sensitive).
-2. Keep column names exactly as documented.
-3. Keep C# model/view-model property names aligned with documented field names (use the same underscore naming if the spec uses underscore naming).
-4. Do not silently normalize names to camelCase/PascalCase variants that differ from the spec fields.
-5. Ensure `OnModelCreating` maps are exact and explicit even when property names already match DB fields.
-6. If renaming from old style to spec style:
-   - update all references in `Domain`, `Models`, `Services`, and `Components`
-   - add migration to align model snapshot
-   - run `dotnet ef database update` and verify resulting schema names
-7. For Bai 1 + Bai 2 + Bai 3 + Bai 4 in this repo, enforce these canonical names:
-   - table `tbl_DM_Don_Vi_Tinh`: `Don_Vi_Tinh_ID`, `Ten_Don_Vi_Tinh`, `Ghi_Chu`
-   - table `tbl_DM_Loai_San_Pham`: `Loai_San_Pham_ID`, `Ma_LSP`, `Ten_LSP`, `Ghi_Chu`
-   - table `tbl_DM_San_Pham`: `San_Pham_ID`, `Ma_San_Pham`, `Ten_San_Pham`, `Loai_San_Pham_ID`, `Don_Vi_Tinh_ID`, `Ghi_Chu`
-   - table `tbl_DM_NCC`: `NCC_ID`, `Ma_NCC`, `Ten_NCC`, `Ghi_Chu`
+1. Keep DB table/column names exactly as documented (case/underscore sensitive).
+2. Keep EF Core mapping explicit in `OnModelCreating` via `ToTable` and `HasColumnName`.
+3. In C# code, keep naming clean and consistent (PascalCase for public members); do not leak DB underscore style into all application layers by default.
+4. If schema change is required, update migrations and verify update path:
+   - `dotnet ef migrations add <Name> --output-dir Infrastructure/Data/Migrations`
+   - `dotnet ef database update`
 
 ## Delete Hygiene (Mandatory)
 

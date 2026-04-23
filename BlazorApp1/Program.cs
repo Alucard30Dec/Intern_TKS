@@ -39,6 +39,7 @@ public sealed class Program
         builder.Services.AddScoped<INhaCungCapService, NhaCungCapService>();
         builder.Services.AddScoped<IKhoService, KhoService>();
         builder.Services.AddScoped<IKhoUserService, KhoUserService>();
+        builder.Services.AddScoped<IAppSelectionContextService, AppSelectionContextService>();
         builder.Services.AddScoped<INhapKhoService, NhapKhoService>();
         builder.Services.AddScoped<IXuatKhoService, XuatKhoService>();
         builder.Services.AddScoped<IBaoCaoService, BaoCaoService>();

@@ -98,22 +98,39 @@ public sealed class DonViTinhService : IDonViTinhService
         }
 
         var normalizedName = NormalizeName(model.Ten_Don_Vi_Tinh);
+        var normalizedGhiChu = NormalizeNullableText(model.Ghi_Chu);
+        var compareValue = normalizedName.ToUpper();
 
         try
         {
             await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-            var duplicated = await ExistsByNameAsync(dbContext, normalizedName, null, cancellationToken);
-            if (duplicated)
+            var activeDuplicated = await dbContext.DonViTinhs.AnyAsync(
+                x => x.Is_Active && x.Ten_Don_Vi_Tinh.ToUpper() == compareValue,
+                cancellationToken);
+            if (activeDuplicated)
             {
                 return ServiceResult.Fail("Tên đơn vị tính đã tồn tại.");
+            }
+
+            var inactiveRecord = await dbContext.DonViTinhs.FirstOrDefaultAsync(
+                x => !x.Is_Active && x.Ten_Don_Vi_Tinh.ToUpper() == compareValue,
+                cancellationToken);
+            if (inactiveRecord is not null)
+            {
+                inactiveRecord.Is_Active = true;
+                inactiveRecord.Ten_Don_Vi_Tinh = normalizedName;
+                inactiveRecord.Ghi_Chu = normalizedGhiChu;
+
+                await dbContext.SaveChangesAsync(cancellationToken);
+                return ServiceResult.Ok("Khôi phục đơn vị tính thành công.");
             }
 
             var entity = new DonViTinh
             {
                 Ten_Don_Vi_Tinh = normalizedName,
                 // Luu null thay vi chuoi rong de tranh sai lech khi loc/bao cao du lieu "co ghi chu".
-                Ghi_Chu = NormalizeNullableText(model.Ghi_Chu),
+                Ghi_Chu = normalizedGhiChu,
                 Is_Active = true
             };
 

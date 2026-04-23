@@ -1,0 +1,339 @@
+@using System.Globalization
+@using System.Text
+
+@if (Visible)
+{
+    <div class="excel-preview-overlay" role="dialog" aria-modal="true" @onclick="HandleCloseAsync">
+        <section class="excel-preview-dialog" @onclick:stopPropagation="true">
+            <header class="excel-preview-dialog__head">
+                <div>
+                    <h2>Xem trước dữ liệu nhập từ Excel</h2>
+                    <p>Kiểm tra dữ liệu trước khi nhập vào hệ thống</p>
+                </div>
+                <button type="button" class="excel-preview-dialog__close" @onclick="HandleCloseAsync" aria-label="Đóng">
+                    ×
+                </button>
+            </header>
+
+            <section class="excel-preview-meta">
+                <div class="excel-preview-file">
+                    <div class="excel-preview-file__icon" aria-hidden="true">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                            <path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7l-5-5Z" fill="#107C41"></path>
+                            <path d="M14 2v5h5" fill="#0B5E31"></path>
+                            <path d="m9 16 1.6-2.4L9.1 11h1.5l.8 1.5.8-1.5h1.5l-1.5 2.6 1.6 2.4h-1.6l-.9-1.6-.9 1.6H9Z" fill="#fff"></path>
+                        </svg>
+                    </div>
+                    <div class="excel-preview-file__content">
+                        <strong>@FileName</strong>
+                        <span>Sheet: @SheetName</span>
+                    </div>
+                </div>
+
+                <div class="excel-preview-counter">
+                    <span class="excel-preview-counter__label">Tổng số dòng</span>
+                    <strong class="excel-preview-counter__value excel-preview-counter__value--total">@TotalRows</strong>
+                </div>
+                <div class="excel-preview-counter">
+                    <span class="excel-preview-counter__label">Dòng hợp lệ</span>
+                    <strong class="excel-preview-counter__value excel-preview-counter__value--success">@ValidRows</strong>
+                </div>
+                <div class="excel-preview-counter">
+                    <span class="excel-preview-counter__label">Dòng lỗi</span>
+                    <strong class="excel-preview-counter__value excel-preview-counter__value--error">@ErrorRows</strong>
+                </div>
+            </section>
+
+            <section class="excel-preview-tools">
+                <label class="excel-preview-search">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <path d="m21 21-4.3-4.3"></path>
+                    </svg>
+                    <input value="@searchKeyword"
+                           @oninput="HandleSearchInput"
+                           placeholder="Tìm trong dữ liệu xem trước" />
+                </label>
+
+                <label class="excel-preview-toggle">
+                    <input type="checkbox" checked="@onlyError" @onchange="HandleOnlyErrorChanged" />
+                    <span class="excel-preview-toggle__switch" aria-hidden="true"></span>
+                    <span class="excel-preview-toggle__label">Chỉ hiện dòng lỗi</span>
+                </label>
+            </section>
+
+            <div class="excel-preview-table-wrap">
+                <table class="excel-preview-table">
+                    <thead>
+                        <tr>
+                            <th>STT</th>
+                            @foreach (var header in ColumnHeaders)
+                            {
+                                <th>@header</th>
+                            }
+                            <th>TRẠNG THÁI</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (FilteredRows.Count == 0)
+                        {
+                            <tr>
+                                <td colspan="@(ColumnHeaders.Count + 2)" class="excel-preview-table__empty">
+                                    Không có dữ liệu phù hợp bộ lọc.
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var row in FilteredRows)
+                            {
+                                <tr class="@GetRowClass(row)">
+                                    <td>@row.DisplayIndex</td>
+                                    @for (var cellIndex = 0; cellIndex < row.Cells.Count; cellIndex++)
+                                    {
+                                        var cell = row.Cells[cellIndex];
+                                        var cellContext = new ExcelImportPreviewCellContext(row, cellIndex, cell);
+                                        <td class="@(CellTemplate is null ? GetCellClass(cell) : "excel-preview-table__cell")">
+                                            @if (CellTemplate is null)
+                                            {
+                                                @GetCellText(cell)
+                                            }
+                                            else
+                                            {
+                                                @CellTemplate(cellContext)
+                                            }
+                                        </td>
+                                    }
+                                    <td>
+                                        <span class="@GetStatusTagClass(row.Status)">@GetStatusLabel(row.Status)</span>
+                                        @if (!string.IsNullOrWhiteSpace(row.Message))
+                                        {
+                                            <div class="excel-preview-status-message">@row.Message</div>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <footer class="excel-preview-footer">
+                <div class="excel-preview-footer__tips">
+                    <span class="excel-preview-footer__tips-icon" aria-hidden="true">i</span>
+                    <div class="excel-preview-footer__tips-lines">
+                        <div>• Dòng lỗi sẽ không được nhập</div>
+                        <div>• Có thể tiếp tục nhập các dòng hợp lệ</div>
+                    </div>
+                </div>
+                <div class="excel-preview-footer__actions">
+                    <button type="button" class="excel-preview-btn excel-preview-btn--secondary excel-preview-footer__btn" @onclick="HandleCloseAsync" disabled="@IsApplying">
+                        Hủy
+                    </button>
+                    <button type="button"
+                            class="excel-preview-btn excel-preview-btn--primary excel-preview-footer__btn"
+                            @onclick="HandleConfirmAsync"
+                            disabled="@(IsApplying || ValidRows == 0)">
+                        @(IsApplying ? "Đang nhập..." : $"Nhập dữ liệu ({ValidRows} dòng hợp lệ)")
+                    </button>
+                </div>
+            </footer>
+        </section>
+    </div>
+}
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public string FileName { get; set; } = string.Empty;
+    [Parameter] public string SheetName { get; set; } = "Sheet1";
+    [Parameter] public IReadOnlyList<string> ColumnHeaders { get; set; } = [];
+    [Parameter] public IReadOnlyList<ExcelImportPreviewRow> Rows { get; set; } = [];
+    [Parameter] public bool IsApplying { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback OnConfirm { get; set; }
+    [Parameter] public RenderFragment<ExcelImportPreviewCellContext>? CellTemplate { get; set; }
+
+    private string searchKeyword = string.Empty;
+    private bool onlyError;
+    private string? previousSessionKey;
+
+    private IReadOnlyList<ExcelImportPreviewRow> FilteredRows
+    {
+        get
+        {
+            IEnumerable<ExcelImportPreviewRow> query = Rows;
+
+            if (onlyError)
+            {
+                query = query.Where(x => x.Status == ExcelImportPreviewStatus.Error);
+            }
+
+            if (!string.IsNullOrWhiteSpace(searchKeyword))
+            {
+                var normalizedKeywords = searchKeyword
+                    .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .Select(NormalizeForSearch)
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .ToList();
+
+                if (normalizedKeywords.Count > 0)
+                {
+                    query = query.Where(x => MatchesKeywords(x, normalizedKeywords));
+                }
+            }
+
+            return query.ToList();
+        }
+    }
+
+    private int TotalRows => Rows.Count;
+    private int ValidRows => Rows.Count(x => x.CanImport);
+    private int ErrorRows => Rows.Count(x => x.Status == ExcelImportPreviewStatus.Error);
+
+    protected override void OnParametersSet()
+    {
+        if (!Visible)
+        {
+            ResetFilters();
+            previousSessionKey = null;
+            return;
+        }
+
+        var sessionKey = $"{FileName}|{SheetName}|{Rows.Count}";
+        if (!string.Equals(previousSessionKey, sessionKey, StringComparison.Ordinal))
+        {
+            ResetFilters();
+            previousSessionKey = sessionKey;
+        }
+    }
+
+    private async Task HandleCloseAsync()
+    {
+        if (OnClose.HasDelegate)
+        {
+            await OnClose.InvokeAsync();
+        }
+    }
+
+    private async Task HandleConfirmAsync()
+    {
+        if (OnConfirm.HasDelegate)
+        {
+            await OnConfirm.InvokeAsync();
+        }
+    }
+
+    private void HandleSearchInput(ChangeEventArgs args)
+    {
+        searchKeyword = args.Value?.ToString() ?? string.Empty;
+    }
+
+    private void HandleOnlyErrorChanged(ChangeEventArgs args)
+    {
+        onlyError = args.Value switch
+        {
+            bool value => value,
+            string text when bool.TryParse(text, out var parsed) => parsed,
+            _ => false
+        };
+    }
+
+    private static string GetRowClass(ExcelImportPreviewRow row)
+    {
+        return row.Status switch
+        {
+            ExcelImportPreviewStatus.Error => "excel-preview-table__row excel-preview-table__row--error",
+            ExcelImportPreviewStatus.Warning => "excel-preview-table__row excel-preview-table__row--warning",
+            _ => "excel-preview-table__row"
+        };
+    }
+
+    private static string GetCellClass(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value)
+            ? "excel-preview-table__cell excel-preview-table__cell--muted"
+            : "excel-preview-table__cell";
+    }
+
+    private static string GetCellText(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "Trống" : value;
+    }
+
+    private static string GetStatusTagClass(ExcelImportPreviewStatus status)
+    {
+        return status switch
+        {
+            ExcelImportPreviewStatus.Error => "excel-preview-status excel-preview-status--error",
+            ExcelImportPreviewStatus.Warning => "excel-preview-status excel-preview-status--warning",
+            _ => "excel-preview-status excel-preview-status--success"
+        };
+    }
+
+    private static string GetStatusLabel(ExcelImportPreviewStatus status)
+    {
+        return status switch
+        {
+            ExcelImportPreviewStatus.Error => "Lỗi",
+            ExcelImportPreviewStatus.Warning => "Cảnh báo",
+            _ => "Hợp lệ"
+        };
+    }
+
+    private static bool MatchesKeywords(ExcelImportPreviewRow row, IReadOnlyList<string> keywords)
+    {
+        var source = string.Join(" ", row.Cells) + " " + row.Message;
+        var normalizedSource = NormalizeForSearch(source);
+        return keywords.All(normalizedSource.Contains);
+    }
+
+    private static string NormalizeForSearch(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var normalized = value.Normalize(NormalizationForm.FormD);
+        var builder = new StringBuilder(normalized.Length);
+        var previousWhiteSpace = false;
+
+        foreach (var ch in normalized)
+        {
+            var category = CharUnicodeInfo.GetUnicodeCategory(ch);
+            if (category == UnicodeCategory.NonSpacingMark)
+            {
+                continue;
+            }
+
+            var lower = char.ToLowerInvariant(ch);
+            if (lower == 'đ')
+            {
+                lower = 'd';
+            }
+
+            if (char.IsWhiteSpace(lower))
+            {
+                if (previousWhiteSpace)
+                {
+                    continue;
+                }
+
+                builder.Append(' ');
+                previousWhiteSpace = true;
+                continue;
+            }
+
+            builder.Append(lower);
+            previousWhiteSpace = false;
+        }
+
+        return builder.ToString().Trim();
+    }
+
+    private void ResetFilters()
+    {
+        searchKeyword = string.Empty;
+        onlyError = false;
+    }
+}

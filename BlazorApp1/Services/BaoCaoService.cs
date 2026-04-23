@@ -31,6 +31,8 @@ public sealed class BaoCaoService : IBaoCaoService
             return ServiceResult<IReadOnlyList<BaoCaoChiTietNhapItemVm>>.Fail(validationMessage);
         }
 
+        var khoId = dieuKien.Kho_ID;
+
         try
         {
             await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
@@ -40,6 +42,7 @@ public sealed class BaoCaoService : IBaoCaoService
                 .Where(x => x.Is_Active
                             && x.Nhap_Kho != null
                             && x.Nhap_Kho.Is_Active
+                            && (!khoId.HasValue || x.Nhap_Kho.Kho_ID == khoId.Value)
                             && x.Nhap_Kho.Ngay_Nhap_Kho >= tuNgayChuan
                             && x.Nhap_Kho.Ngay_Nhap_Kho <= denNgayChuan)
                 .OrderBy(x => x.Nhap_Kho!.Ngay_Nhap_Kho)
@@ -82,6 +85,8 @@ public sealed class BaoCaoService : IBaoCaoService
             return ServiceResult<IReadOnlyList<BaoCaoChiTietXuatItemVm>>.Fail(validationMessage);
         }
 
+        var khoId = dieuKien.Kho_ID;
+
         try
         {
             await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
@@ -91,6 +96,7 @@ public sealed class BaoCaoService : IBaoCaoService
                 .Where(x => x.Is_Active
                             && x.Xuat_Kho != null
                             && x.Xuat_Kho.Is_Active
+                            && (!khoId.HasValue || x.Xuat_Kho.Kho_ID == khoId.Value)
                             && x.Xuat_Kho.Ngay_Xuat_Kho >= tuNgayChuan
                             && x.Xuat_Kho.Ngay_Xuat_Kho <= denNgayChuan)
                 .OrderBy(x => x.Xuat_Kho!.Ngay_Xuat_Kho)
@@ -130,6 +136,8 @@ public sealed class BaoCaoService : IBaoCaoService
             return ServiceResult<IReadOnlyList<BaoCaoXuatNhapTonItemVm>>.Fail(validationMessage);
         }
 
+        var khoId = dieuKien.Kho_ID;
+
         try
         {
             await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
@@ -139,6 +147,7 @@ public sealed class BaoCaoService : IBaoCaoService
                 .Where(x => x.Is_Active
                             && x.Nhap_Kho != null
                             && x.Nhap_Kho.Is_Active
+                            && (!khoId.HasValue || x.Nhap_Kho.Kho_ID == khoId.Value)
                             && x.Nhap_Kho.Ngay_Nhap_Kho < tuNgayChuan)
                 .GroupBy(x => x.San_Pham_ID)
                 .Select(x => new { San_Pham_ID = x.Key, SoLuong = x.Sum(y => y.SL_Nhap) })
@@ -149,6 +158,7 @@ public sealed class BaoCaoService : IBaoCaoService
                 .Where(x => x.Is_Active
                             && x.Xuat_Kho != null
                             && x.Xuat_Kho.Is_Active
+                            && (!khoId.HasValue || x.Xuat_Kho.Kho_ID == khoId.Value)
                             && x.Xuat_Kho.Ngay_Xuat_Kho < tuNgayChuan)
                 .GroupBy(x => x.San_Pham_ID)
                 .Select(x => new { San_Pham_ID = x.Key, SoLuong = x.Sum(y => y.SL_Xuat) })
@@ -159,6 +169,7 @@ public sealed class BaoCaoService : IBaoCaoService
                 .Where(x => x.Is_Active
                             && x.Nhap_Kho != null
                             && x.Nhap_Kho.Is_Active
+                            && (!khoId.HasValue || x.Nhap_Kho.Kho_ID == khoId.Value)
                             && x.Nhap_Kho.Ngay_Nhap_Kho >= tuNgayChuan
                             && x.Nhap_Kho.Ngay_Nhap_Kho <= denNgayChuan)
                 .GroupBy(x => x.San_Pham_ID)
@@ -170,6 +181,7 @@ public sealed class BaoCaoService : IBaoCaoService
                 .Where(x => x.Is_Active
                             && x.Xuat_Kho != null
                             && x.Xuat_Kho.Is_Active
+                            && (!khoId.HasValue || x.Xuat_Kho.Kho_ID == khoId.Value)
                             && x.Xuat_Kho.Ngay_Xuat_Kho >= tuNgayChuan
                             && x.Xuat_Kho.Ngay_Xuat_Kho <= denNgayChuan)
                 .GroupBy(x => x.San_Pham_ID)

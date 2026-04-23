@@ -11,7 +11,7 @@ public interface INhapKhoService
     /// <summary>
     /// Lay danh sach phieu nhap kho de hien thi tren man hinh quan ly.
     /// </summary>
-    Task<IReadOnlyList<NhapKhoListItemVm>> GetAllAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<NhapKhoListItemVm>> GetAllAsync(int? khoId = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Lay danh sach chi tiet cua mot phieu nhap kho.

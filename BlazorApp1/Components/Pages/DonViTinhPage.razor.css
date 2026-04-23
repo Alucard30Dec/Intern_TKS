@@ -403,6 +403,388 @@
         background: #f1f5f9;
     }
 
+.excel-preview-overlay {
+    align-items: flex-start;
+    background: rgba(15, 23, 42, 0.33);
+    display: flex;
+    inset: 0;
+    justify-content: center;
+    padding: 6vh 1rem 1rem;
+    position: fixed;
+    z-index: 1200;
+}
+
+.excel-preview-dialog {
+    background: #ffffff;
+    border: 1px solid #d6e1ee;
+    border-radius: 14px;
+    box-shadow: 0 18px 36px rgba(15, 23, 42, 0.22);
+    display: grid;
+    gap: 0.62rem;
+    max-height: min(90vh, 840px);
+    width: min(820px, calc(100vw - 2rem));
+    min-width: 0;
+    overflow: hidden;
+}
+
+.excel-preview-dialog__head {
+    align-items: flex-start;
+    border-bottom: 1px solid #e7edf5;
+    display: flex;
+    justify-content: space-between;
+    padding: 0.92rem 1.12rem 0.86rem;
+}
+
+    .excel-preview-dialog__head h2 {
+        color: #16233b;
+        font-size: 1.05rem;
+        font-weight: 800;
+        line-height: 1.2;
+        margin: 0;
+    }
+
+    .excel-preview-dialog__head p {
+        color: #5f708a;
+        font-size: 0.72rem;
+        margin: 0.18rem 0 0;
+    }
+
+.excel-preview-dialog__close {
+    background: transparent;
+    border: none;
+    color: #93a3b8;
+    cursor: pointer;
+    font-size: 1.5rem;
+    line-height: 1;
+    margin-top: -0.24rem;
+    padding: 0 0.12rem;
+}
+
+.excel-preview-meta {
+    align-items: stretch;
+    border: 1px solid #dce6f2;
+    border-radius: 10px;
+    display: grid;
+    gap: 0.52rem;
+    grid-template-columns: minmax(0, 1fr) repeat(3, minmax(100px, 120px));
+    margin: 0 1.12rem;
+    padding: 0.58rem 0.74rem;
+}
+
+.excel-preview-file {
+    align-items: center;
+    display: flex;
+    gap: 0.72rem;
+    min-width: 0;
+}
+
+.excel-preview-file__icon {
+    align-items: center;
+    background: #eef9f2;
+    border: 1px solid #cdeed8;
+    border-radius: 8px;
+    display: inline-flex;
+    flex: 0 0 42px;
+    height: 42px;
+    justify-content: center;
+    width: 42px;
+}
+
+.excel-preview-file__content {
+    display: grid;
+    gap: 0.15rem;
+    min-width: 0;
+}
+
+    .excel-preview-file__content strong {
+        color: #1e293b;
+        font-size: 0.9rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .excel-preview-file__content span {
+        color: #66768f;
+        font-size: 0.74rem;
+    }
+
+.excel-preview-counter {
+    align-items: center;
+    display: grid;
+    justify-items: center;
+}
+
+.excel-preview-counter__label {
+    color: #66768f;
+    font-size: 0.73rem;
+}
+
+.excel-preview-counter__value {
+    font-size: 0.92rem;
+    font-weight: 800;
+    line-height: 1.15;
+}
+
+.excel-preview-counter__value--total {
+    color: #1d4ed8;
+}
+
+.excel-preview-counter__value--success {
+    color: #15803d;
+}
+
+.excel-preview-counter__value--error {
+    color: #dc2626;
+}
+
+.excel-preview-tools {
+    align-items: center;
+    display: flex;
+    gap: 0.75rem;
+    justify-content: space-between;
+    margin: 0 1.12rem;
+}
+
+.excel-preview-search {
+    align-items: center;
+    border: 1px solid #cfdaea;
+    border-radius: 10px;
+    color: #6b7a92;
+    display: inline-flex;
+    gap: 0.55rem;
+    min-height: 38px;
+    padding: 0 0.68rem;
+    width: min(350px, 100%);
+}
+
+    .excel-preview-search input {
+        border: none;
+        color: #1f2a3d;
+        flex: 1;
+        font: inherit;
+        font-size: 0.88rem;
+        min-width: 0;
+        outline: none;
+    }
+
+.excel-preview-toggle {
+    align-items: center;
+    color: #4d5d75;
+    cursor: pointer;
+    display: inline-flex;
+    font-size: 0.88rem;
+    font-weight: 600;
+    gap: 0.5rem;
+    white-space: nowrap;
+}
+
+    .excel-preview-toggle input {
+        height: 1px;
+        opacity: 0;
+        position: absolute;
+        width: 1px;
+    }
+
+.excel-preview-toggle__switch {
+    background: #d5dde7;
+    border-radius: 999px;
+    display: inline-flex;
+    flex: 0 0 38px;
+    height: 22px;
+    position: relative;
+    transition: background-color 0.16s ease;
+    width: 38px;
+}
+
+    .excel-preview-toggle__switch::after {
+        background: #ffffff;
+        border-radius: 50%;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.2);
+        content: "";
+        height: 16px;
+        left: 3px;
+        position: absolute;
+        top: 3px;
+        transition: transform 0.16s ease;
+        width: 16px;
+    }
+
+.excel-preview-toggle input:checked + .excel-preview-toggle__switch {
+    background: #99d9d2;
+}
+
+.excel-preview-toggle input:checked + .excel-preview-toggle__switch::after {
+    transform: translateX(16px);
+}
+
+.excel-preview-table-wrap {
+    border-bottom: 1px solid #e7edf5;
+    border-top: 1px solid #e7edf5;
+    margin: 0 1.12rem;
+    max-height: 334px;
+    overflow: auto;
+}
+
+.excel-preview-table {
+    border-collapse: separate;
+    border-spacing: 0;
+    width: 100%;
+}
+
+    .excel-preview-table th,
+    .excel-preview-table td {
+        border-bottom: 1px solid #ebf1f7;
+        font-size: 0.86rem;
+        padding: 0.56rem 0.52rem;
+        text-align: left;
+        vertical-align: middle;
+    }
+
+    .excel-preview-table th {
+        background: #f6f9fc;
+        color: #4a5a71;
+        font-size: 0.76rem;
+        font-weight: 800;
+        letter-spacing: 0.01em;
+        position: sticky;
+        text-transform: uppercase;
+        top: 0;
+        z-index: 1;
+    }
+
+.excel-preview-table__row--error {
+    background: #fff1f2;
+}
+
+.excel-preview-table__row--warning {
+    background: #fffaf0;
+}
+
+.excel-preview-table__name {
+    color: #0f172a;
+    font-weight: 700;
+}
+
+.excel-preview-table__name--error {
+    color: #dc2626;
+    font-style: italic;
+    font-weight: 700;
+}
+
+.excel-preview-table__note {
+    color: #1f2937;
+}
+
+.excel-preview-table__note--muted {
+    color: #94a3b8;
+    font-style: italic;
+}
+
+.excel-preview-table__note--warning {
+    color: #ea580c;
+    font-style: italic;
+    font-weight: 600;
+}
+
+.excel-preview-table__note--error {
+    color: #dc2626;
+    font-weight: 600;
+}
+
+.excel-preview-table__empty {
+    color: #6b7a92;
+    text-align: center !important;
+}
+
+.excel-preview-status {
+    border: 1px solid transparent;
+    border-radius: 8px;
+    display: inline-flex;
+    font-size: 0.78rem;
+    font-weight: 700;
+    justify-content: center;
+    min-width: 58px;
+    padding: 0.22rem 0.44rem;
+}
+
+.excel-preview-status--success {
+    background: #e9f9ef;
+    border-color: #b9ebcc;
+    color: #15803d;
+}
+
+.excel-preview-status--warning {
+    background: #fff3e0;
+    border-color: #f8d3a8;
+    color: #c2410c;
+}
+
+.excel-preview-status--error {
+    background: #ffe7ea;
+    border-color: #fecdd3;
+    color: #dc2626;
+}
+
+.excel-preview-footer {
+    align-items: center;
+    display: flex;
+    gap: 0.7rem;
+    justify-content: space-between;
+    padding: 0 1.12rem 0.82rem;
+}
+
+.excel-preview-footer__tips {
+    align-items: center;
+    background: #f4f8fe;
+    border: 1px solid #d8e4f3;
+    border-radius: 10px;
+    color: #42546e;
+    display: inline-flex;
+    font-size: 0.78rem;
+    gap: 0.48rem;
+    line-height: 1.3;
+    padding: 0.46rem 0.56rem;
+}
+
+.excel-preview-footer__tips-icon {
+    align-items: center;
+    background: #2d7ef7;
+    border-radius: 50%;
+    color: #fff;
+    display: inline-flex;
+    flex: 0 0 16px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    height: 16px;
+    justify-content: center;
+    width: 16px;
+}
+
+.excel-preview-footer__tips-lines {
+    display: grid;
+    gap: 0.12rem;
+}
+
+.excel-preview-footer__actions {
+    display: inline-flex;
+    gap: 0.52rem;
+}
+
+.excel-preview-footer__btn {
+    font-size: 0.82rem;
+    min-height: 36px;
+    padding: 0.48rem 0.9rem;
+}
+
+.excel-preview-footer__btn--cancel {
+    min-width: 82px;
+}
+
+.excel-preview-footer__btn--confirm {
+    min-width: 196px;
+}
+
 ::deep .validation-message {
     color: #b91c1c;
     display: block;
@@ -442,5 +824,29 @@
     .data-table th,
     .data-table td {
         padding: 0.66rem 0.52rem;
+    }
+
+    .excel-preview-dialog {
+        max-height: calc(100vh - 1rem);
+        min-width: 0;
+        width: calc(100vw - 1rem);
+    }
+
+    .excel-preview-dialog__head h2 {
+        font-size: 1rem;
+    }
+
+    .excel-preview-meta {
+        grid-template-columns: 1fr;
+    }
+
+    .excel-preview-tools,
+    .excel-preview-footer {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .excel-preview-search {
+        width: 100%;
     }
 }

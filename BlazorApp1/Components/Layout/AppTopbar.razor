@@ -1,0 +1,176 @@
+@implements IDisposable
+@using BlazorApp1.Services.Interfaces
+@inject IAppSelectionContextService SelectionContext
+@inject ILogger<AppTopbar> Logger
+
+<div class="app-topbar-host">
+    @if (IsAnyDropdownOpen)
+    {
+        <button type="button"
+                class="topbar-overlay"
+                aria-label="Đóng menu"
+                @onclick="CloseAllDropdowns"></button>
+    }
+
+    <header class="app-topbar">
+        <div class="app-topbar__spacer"></div>
+        <div class="app-topbar__actions">
+            <div class="topbar-dropdown">
+                <button type="button"
+                        class="topbar-pill"
+                        aria-label="Kho đang chọn"
+                        @onclick="ToggleKhoDropdown"
+                        disabled="@(isLoadingTopbar || SelectionContext.KhoOptions.Count == 0)">
+                    <span class="topbar-pill__icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" focusable="false">
+                            <path d="M3 10.25 12 5l9 5.25v9.25A1.5 1.5 0 0 1 19.5 21h-15A1.5 1.5 0 0 1 3 19.5zM5 11.41V19h14v-7.59L12 7.33z"></path>
+                            <path d="M9 13h6v6H9z"></path>
+                        </svg>
+                    </span>
+                    <span class="topbar-pill__text">Kho: @SelectedKhoLabel</span>
+                    <span class="topbar-pill__caret @(isKhoDropdownOpen ? "topbar-pill__caret--open" : string.Empty)" aria-hidden="true">▾</span>
+                </button>
+
+                @if (isKhoDropdownOpen)
+                {
+                    <div class="topbar-menu" role="menu" aria-label="Danh sách kho">
+                        @foreach (var kho in SelectionContext.KhoOptions)
+                        {
+                            var isSelected = SelectionContext.SelectedKhoId == kho.Kho_ID;
+
+                            <button type="button"
+                                    class="topbar-menu__item @(isSelected ? "topbar-menu__item--active" : string.Empty)"
+                                    @onclick="() => SelectKhoAsync(kho.Kho_ID)">
+                                <span class="topbar-menu__label">@kho.Ten_Kho</span>
+                                <span class="topbar-menu__check">@((isSelected) ? "✓" : string.Empty)</span>
+                            </button>
+                        }
+                    </div>
+                }
+            </div>
+
+            <div class="topbar-dropdown topbar-dropdown--user">
+                <button type="button"
+                        class="topbar-pill topbar-pill--user"
+                        aria-label="Người dùng hiện tại"
+                        @onclick="ToggleUserDropdown"
+                        disabled="@(isLoadingTopbar || SelectionContext.LoginOptions.Count == 0)">
+                    <span class="topbar-pill__icon topbar-pill__icon--user" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" focusable="false">
+                            <path d="M12 12a4.25 4.25 0 1 0 0-8.5 4.25 4.25 0 0 0 0 8.5zm0 2c-4.3 0-8 2.2-8 5v1h16v-1c0-2.8-3.7-5-8-5z"></path>
+                        </svg>
+                    </span>
+                    <span class="topbar-pill__text">@SelectedLoginLabel</span>
+                    <span class="topbar-pill__caret @(isUserDropdownOpen ? "topbar-pill__caret--open" : string.Empty)" aria-hidden="true">▾</span>
+                </button>
+
+                @if (isUserDropdownOpen)
+                {
+                    <div class="topbar-menu" role="menu" aria-label="Danh sách mã đăng nhập">
+                        @foreach (var user in SelectionContext.LoginOptions)
+                        {
+                            var isSelected = string.Equals(
+                                SelectionContext.SelectedLogin,
+                                user,
+                                StringComparison.OrdinalIgnoreCase);
+
+                            <button type="button"
+                                    class="topbar-menu__item @(isSelected ? "topbar-menu__item--active" : string.Empty)"
+                                    @onclick="() => SelectLoginAsync(user)">
+                                <span class="topbar-menu__label">@user</span>
+                                <span class="topbar-menu__check">@((isSelected) ? "✓" : string.Empty)</span>
+                            </button>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    </header>
+</div>
+
+@code {
+    private bool isLoadingTopbar = true;
+    private bool isKhoDropdownOpen;
+    private bool isUserDropdownOpen;
+
+    private bool IsAnyDropdownOpen => isKhoDropdownOpen || isUserDropdownOpen;
+    private string SelectedKhoLabel =>
+        string.IsNullOrWhiteSpace(SelectionContext.SelectedKhoName) ? "Không có kho được phân quyền" : SelectionContext.SelectedKhoName;
+    private string SelectedLoginLabel =>
+        string.IsNullOrWhiteSpace(SelectionContext.SelectedLogin) ? "ADMIN" : SelectionContext.SelectedLogin;
+
+    protected override async Task OnInitializedAsync()
+    {
+        SelectionContext.SelectionChanged += HandleSelectionChanged;
+
+        try
+        {
+            isLoadingTopbar = true;
+            await SelectionContext.EnsureInitializedAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Initialize topbar selection failed.");
+        }
+        finally
+        {
+            isLoadingTopbar = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        SelectionContext.SelectionChanged -= HandleSelectionChanged;
+    }
+
+    private void HandleSelectionChanged()
+    {
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void ToggleKhoDropdown()
+    {
+        if (isLoadingTopbar || SelectionContext.KhoOptions.Count == 0)
+        {
+            return;
+        }
+
+        isKhoDropdownOpen = !isKhoDropdownOpen;
+        if (isKhoDropdownOpen)
+        {
+            isUserDropdownOpen = false;
+        }
+    }
+
+    private void ToggleUserDropdown()
+    {
+        if (isLoadingTopbar || SelectionContext.LoginOptions.Count == 0)
+        {
+            return;
+        }
+
+        isUserDropdownOpen = !isUserDropdownOpen;
+        if (isUserDropdownOpen)
+        {
+            isKhoDropdownOpen = false;
+        }
+    }
+
+    private async Task SelectKhoAsync(int khoId)
+    {
+        await SelectionContext.SetSelectedKhoAsync(khoId);
+        isKhoDropdownOpen = false;
+    }
+
+    private async Task SelectLoginAsync(string loginCode)
+    {
+        await SelectionContext.SetSelectedLoginAsync(loginCode);
+        isUserDropdownOpen = false;
+    }
+
+    private void CloseAllDropdowns()
+    {
+        isKhoDropdownOpen = false;
+        isUserDropdownOpen = false;
+    }
+}

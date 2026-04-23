@@ -27,13 +27,20 @@ public sealed class XuatKhoService : IXuatKhoService
     /// <summary>
     /// Lay danh sach phieu xuat kho cho man hinh quan ly.
     /// </summary>
-    public async Task<IReadOnlyList<XuatKhoListItemVm>> GetAllAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<XuatKhoListItemVm>> GetAllAsync(int? khoId = null, CancellationToken cancellationToken = default)
     {
         await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        return await dbContext.XuatKhos
+        var query = dbContext.XuatKhos
             .AsNoTracking()
-            .Where(x => x.Is_Active)
+            .Where(x => x.Is_Active);
+
+        if (khoId.HasValue)
+        {
+            query = query.Where(x => x.Kho_ID == khoId.Value);
+        }
+
+        return await query
             .OrderByDescending(x => x.Ngay_Xuat_Kho)
             .ThenByDescending(x => x.Xuat_Kho_ID)
             .Select(x => new XuatKhoListItemVm
@@ -187,10 +194,10 @@ public sealed class XuatKhoService : IXuatKhoService
             await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
             await using var transaction = await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
 
-            var duplicatedSoPhieu = await dbContext.XuatKhos.AnyAsync(
-                x => x.So_Phieu_Xuat_Kho.ToUpper() == normalizedSoPhieu.ToUpper(),
+            var activeDuplicatedSoPhieu = await dbContext.XuatKhos.AnyAsync(
+                x => x.Is_Active && x.So_Phieu_Xuat_Kho.ToUpper() == normalizedSoPhieu.ToUpper(),
                 cancellationToken);
-            if (duplicatedSoPhieu)
+            if (activeDuplicatedSoPhieu)
             {
                 return ServiceResult.Fail("Số phiếu xuất đã tồn tại.");
             }
@@ -230,6 +237,39 @@ public sealed class XuatKhoService : IXuatKhoService
             if (!stockValidation.Success)
             {
                 return stockValidation;
+            }
+
+            var inactiveVoucher = await dbContext.XuatKhos
+                .Include(x => x.Xuat_Kho_Raw_Datas)
+                .FirstOrDefaultAsync(
+                    x => !x.Is_Active && x.So_Phieu_Xuat_Kho.ToUpper() == normalizedSoPhieu.ToUpper(),
+                    cancellationToken);
+            if (inactiveVoucher is not null)
+            {
+                inactiveVoucher.So_Phieu_Xuat_Kho = normalizedSoPhieu;
+                inactiveVoucher.Kho_ID = model.Kho_ID;
+                inactiveVoucher.Ngay_Xuat_Kho = model.Ngay_Xuat_Kho.Date;
+                inactiveVoucher.Don_Vi_Tien = normalizedDonViTien;
+                inactiveVoucher.Ghi_Chu = normalizedGhiChu;
+                inactiveVoucher.Is_Active = true;
+
+                foreach (var line in inactiveVoucher.Xuat_Kho_Raw_Datas)
+                {
+                    line.Is_Active = false;
+                }
+
+                dbContext.XuatKhoRawDatas.AddRange(normalizedDetails.Select(x => new XuatKhoRawData
+                {
+                    Xuat_Kho_ID = inactiveVoucher.Xuat_Kho_ID,
+                    San_Pham_ID = x.San_Pham_ID,
+                    SL_Xuat = x.SL_Xuat,
+                    Don_Gia_Xuat = x.Don_Gia_Xuat,
+                    Is_Active = true
+                }));
+
+                await dbContext.SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+                return ServiceResult.Ok("Khôi phục phiếu xuất kho thành công.");
             }
 
             var entity = new XuatKho
@@ -469,6 +509,12 @@ public sealed class XuatKhoService : IXuatKhoService
                 return ServiceResult.Fail("Sản phẩm đã tồn tại trong phiếu xuất. Vui lòng sửa dòng hiện có.");
             }
 
+            var inactiveLine = await dbContext.XuatKhoRawDatas.FirstOrDefaultAsync(
+                x => x.Xuat_Kho_ID == xuatKhoId
+                    && x.San_Pham_ID == model.San_Pham_ID
+                    && !x.Is_Active,
+                cancellationToken);
+
             var soLuongXuat = NormalizeQuantity(model.SL_Xuat);
             var stockValidation = await ValidateXuatMutationStockAsync(
                 dbContext,
@@ -483,13 +529,24 @@ public sealed class XuatKhoService : IXuatKhoService
                         header.Ngay_Xuat_Kho,
                         soLuongXuat,
                         xuatKhoId,
-                        int.MaxValue)
+                        inactiveLine?.Xuat_Kho_Raw_Data_ID ?? int.MaxValue)
                 ],
                 operationName: "Không thể thêm dòng chi tiết xuất kho",
                 cancellationToken);
             if (!stockValidation.Success)
             {
                 return stockValidation;
+            }
+
+            if (inactiveLine is not null)
+            {
+                inactiveLine.SL_Xuat = soLuongXuat;
+                inactiveLine.Don_Gia_Xuat = DonViTienOptions.RoundAmount(model.Don_Gia_Xuat, header.Don_Vi_Tien);
+                inactiveLine.Is_Active = true;
+
+                await dbContext.SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+                return ServiceResult.Ok("Khôi phục dòng chi tiết thành công.");
             }
 
             dbContext.XuatKhoRawDatas.Add(new XuatKhoRawData

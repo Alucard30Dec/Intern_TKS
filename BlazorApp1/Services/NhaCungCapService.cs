@@ -102,28 +102,59 @@ public sealed class NhaCungCapService : INhaCungCapService
 
         var normalizedCode = NormalizeCode(model.Ma_NCC);
         var normalizedName = NormalizeName(model.Ten_NCC);
+        var normalizedGhiChu = NormalizeNullableText(model.Ghi_Chu);
+        var compareCode = normalizedCode.ToUpper();
+        var compareName = normalizedName.ToUpper();
 
         try
         {
             await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-            var duplicatedName = await ExistsByNameAsync(dbContext, normalizedName, null, cancellationToken);
-            if (duplicatedName)
+            var activeDuplicatedName = await dbContext.NhaCungCaps.AnyAsync(
+                x => x.Is_Active && x.Ten_NCC.ToUpper() == compareName,
+                cancellationToken);
+            if (activeDuplicatedName)
             {
                 return ServiceResult.Fail("Tên nhà cung cấp đã tồn tại.");
             }
 
-            var duplicatedCode = await ExistsByCodeAsync(dbContext, normalizedCode, null, cancellationToken);
-            if (duplicatedCode)
+            var activeDuplicatedCode = await dbContext.NhaCungCaps.AnyAsync(
+                x => x.Is_Active && x.Ma_NCC.ToUpper() == compareCode,
+                cancellationToken);
+            if (activeDuplicatedCode)
             {
                 return ServiceResult.Fail("Mã nhà cung cấp đã tồn tại.");
+            }
+
+            var inactiveByCode = await dbContext.NhaCungCaps.FirstOrDefaultAsync(
+                x => !x.Is_Active && x.Ma_NCC.ToUpper() == compareCode,
+                cancellationToken);
+            var inactiveByName = await dbContext.NhaCungCaps.FirstOrDefaultAsync(
+                x => !x.Is_Active && x.Ten_NCC.ToUpper() == compareName,
+                cancellationToken);
+
+            if (inactiveByCode is not null && inactiveByName is not null && inactiveByCode.NCC_ID != inactiveByName.NCC_ID)
+            {
+                return ServiceResult.Fail("Mã và tên đang trùng với 2 bản ghi đã xóa khác nhau. Vui lòng khôi phục đúng bản ghi trước khi tạo mới.");
+            }
+
+            var inactiveRecord = inactiveByCode ?? inactiveByName;
+            if (inactiveRecord is not null)
+            {
+                inactiveRecord.Is_Active = true;
+                inactiveRecord.Ma_NCC = normalizedCode;
+                inactiveRecord.Ten_NCC = normalizedName;
+                inactiveRecord.Ghi_Chu = normalizedGhiChu;
+
+                await dbContext.SaveChangesAsync(cancellationToken);
+                return ServiceResult.Ok("Khôi phục nhà cung cấp thành công.");
             }
 
             var entity = new NhaCungCap
             {
                 Ma_NCC = normalizedCode,
                 Ten_NCC = normalizedName,
-                Ghi_Chu = NormalizeNullableText(model.Ghi_Chu),
+                Ghi_Chu = normalizedGhiChu,
                 Is_Active = true
             };
 

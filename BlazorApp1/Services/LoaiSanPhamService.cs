@@ -102,21 +102,52 @@ public sealed class LoaiSanPhamService : ILoaiSanPhamService
 
         var normalizedCode = NormalizeCode(model.Ma_LSP);
         var normalizedName = NormalizeName(model.Ten_LSP);
+        var normalizedGhiChu = NormalizeNullableText(model.Ghi_Chu);
+        var compareCode = normalizedCode.ToUpper();
+        var compareName = normalizedName.ToUpper();
 
         try
         {
             await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-            var duplicatedCode = await ExistsByCodeAsync(dbContext, normalizedCode, null, cancellationToken);
-            if (duplicatedCode)
+            var activeDuplicatedCode = await dbContext.LoaiSanPhams.AnyAsync(
+                x => x.Is_Active && x.Ma_LSP.ToUpper() == compareCode,
+                cancellationToken);
+            if (activeDuplicatedCode)
             {
                 return ServiceResult.Fail("Mã đã tồn tại.");
             }
 
-            var duplicatedName = await ExistsByNameAsync(dbContext, normalizedName, null, cancellationToken);
-            if (duplicatedName)
+            var activeDuplicatedName = await dbContext.LoaiSanPhams.AnyAsync(
+                x => x.Is_Active && x.Ten_LSP.ToUpper() == compareName,
+                cancellationToken);
+            if (activeDuplicatedName)
             {
                 return ServiceResult.Fail("Tên đã tồn tại.");
+            }
+
+            var inactiveByCode = await dbContext.LoaiSanPhams.FirstOrDefaultAsync(
+                x => !x.Is_Active && x.Ma_LSP.ToUpper() == compareCode,
+                cancellationToken);
+            var inactiveByName = await dbContext.LoaiSanPhams.FirstOrDefaultAsync(
+                x => !x.Is_Active && x.Ten_LSP.ToUpper() == compareName,
+                cancellationToken);
+
+            if (inactiveByCode is not null && inactiveByName is not null && inactiveByCode.Loai_San_Pham_ID != inactiveByName.Loai_San_Pham_ID)
+            {
+                return ServiceResult.Fail("Mã và tên đang trùng với 2 bản ghi đã xóa khác nhau. Vui lòng khôi phục đúng bản ghi trước khi tạo mới.");
+            }
+
+            var inactiveRecord = inactiveByCode ?? inactiveByName;
+            if (inactiveRecord is not null)
+            {
+                inactiveRecord.Is_Active = true;
+                inactiveRecord.Ma_LSP = normalizedCode;
+                inactiveRecord.Ten_LSP = normalizedName;
+                inactiveRecord.Ghi_Chu = normalizedGhiChu;
+
+                await dbContext.SaveChangesAsync(cancellationToken);
+                return ServiceResult.Ok("Khôi phục loại sản phẩm thành công.");
             }
 
             var entity = new LoaiSanPham
@@ -124,7 +155,7 @@ public sealed class LoaiSanPhamService : ILoaiSanPhamService
                 Ma_LSP = normalizedCode,
                 Ten_LSP = normalizedName,
                 // Luu null thay vi chuoi rong de tranh sai lech khi thong ke ban ghi "co ghi chu".
-                Ghi_Chu = NormalizeNullableText(model.Ghi_Chu),
+                Ghi_Chu = normalizedGhiChu,
                 Is_Active = true
             };
 

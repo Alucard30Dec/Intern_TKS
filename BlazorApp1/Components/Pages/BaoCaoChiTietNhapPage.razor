@@ -1,9 +1,11 @@
 @page "/bao-cao/chi-tiet-nhap"
 @rendermode InteractiveServer
+@implements IDisposable
 @using BlazorApp1.Models.BaoCao
 @using BlazorApp1.Models.Common
 @using BlazorApp1.Services.Interfaces
 @inject IBaoCaoService BaoCaoService
+@inject IAppSelectionContextService AppSelectionContext
 @inject ILogger<BaoCaoChiTietNhapPage> Logger
 
 <PageTitle>Báo cáo chi tiết hàng nhập</PageTitle>
@@ -267,7 +269,14 @@
 
     protected override async Task OnInitializedAsync()
     {
+        AppSelectionContext.SelectionChanged += HandleSelectionChanged;
+        await AppSelectionContext.EnsureInitializedAsync();
         await SearchAsync();
+    }
+
+    public void Dispose()
+    {
+        AppSelectionContext.SelectionChanged -= HandleSelectionChanged;
     }
 
     private async Task SelectPeriodAsync(BaoCaoKieuLoc periodType)
@@ -285,6 +294,15 @@
     {
         ClearPageMessage();
         items.Clear();
+
+        if (!AppSelectionContext.SelectedKhoId.HasValue)
+        {
+            pageMessage = "Tài khoản đang chọn chưa được phân quyền kho nào.";
+            pageMessageIsError = true;
+            return;
+        }
+
+        filter.Kho_ID = AppSelectionContext.SelectedKhoId.Value;
 
         if (!TryApplyDateRangeByPeriod())
         {
@@ -325,6 +343,11 @@
         {
             isLoading = false;
         }
+    }
+
+    private void HandleSelectionChanged()
+    {
+        _ = InvokeAsync(SearchAsync);
     }
 
     private bool TryApplyDateRangeByPeriod()
@@ -404,6 +427,7 @@
     {
         return new BaoCaoDieuKienVm
         {
+            Kho_ID = null,
             Kieu_Loc = BaoCaoKieuLoc.KhoangNgay,
             Tu_Ngay = DateTime.Today.AddDays(-30),
             Den_Ngay = DateTime.Today,

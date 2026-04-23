@@ -11,7 +11,7 @@ public interface IXuatKhoService
     /// <summary>
     /// Lay danh sach phieu xuat kho de hien thi tren man hinh quan ly.
     /// </summary>
-    Task<IReadOnlyList<XuatKhoListItemVm>> GetAllAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<XuatKhoListItemVm>> GetAllAsync(int? khoId = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Lay danh sach chi tiet cua mot phieu xuat kho.

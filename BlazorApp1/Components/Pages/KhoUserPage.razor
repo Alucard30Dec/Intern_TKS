@@ -1,5 +1,6 @@
 @page "/phan-quyen/kho-user"
 @rendermode InteractiveServer
+@using BlazorApp1.Infrastructure.Excel
 @using BlazorApp1.Models.Kho
 @using BlazorApp1.Models.KhoUser
 @using BlazorApp1.Services.Interfaces
@@ -17,9 +18,32 @@
 
     <header class="page-header">
         <h1>Phân quyền kho-user</h1>
-        <button type="button" class="app-button app-button--primary" @onclick="StartCreate" disabled="@isSaving">
-            Thêm mới
-        </button>
+        <div class="page-header__actions">
+            <button type="button" class="app-button" style="display:inline-flex;align-items:center;justify-content:center;gap:0.42rem;box-sizing:border-box;width:150px;min-width:150px;max-width:150px;white-space:nowrap;background:#ffffff;border:1px solid #6dc7bf;color:#0f8b84;" @onclick="ExportTemplateAsync" disabled="@(isSaving || isImporting || isApplyingImport)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 3v12" />
+                    <path d="m7 10 5 5 5-5" />
+                    <path d="M5 21h14" />
+                </svg>
+                <span>Xuất file mẫu</span>
+            </button>
+            <label class="app-button" style="position:relative;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;gap:0.42rem;box-sizing:border-box;width:150px;min-width:150px;max-width:150px;white-space:nowrap;background:#ffffff;border:1px solid #6dc7bf;color:#0f8b84;@(isSaving || isImporting || isApplyingImport ? "pointer-events:none;opacity:0.65;cursor:wait;" : "cursor:pointer;")">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 21V9" />
+                    <path d="m17 14-5-5-5 5" />
+                    <path d="M5 3h14" />
+                </svg>
+                <span>Nhập file excel</span>
+                <InputFile style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;"
+                           @key="importFileInputVersion"
+                           OnChange="ImportExcelAsync"
+                           accept=".xlsx"
+                           disabled="@(isSaving || isImporting || isApplyingImport)" />
+            </label>
+            <button type="button" class="app-button app-button--primary" @onclick="StartCreate" disabled="@(isSaving || isImporting || isApplyingImport)">
+                Thêm mới
+            </button>
+        </div>
     </header>
 
     @if (!string.IsNullOrWhiteSpace(pageMessage))
@@ -28,6 +52,15 @@
             @pageMessage
         </div>
     }
+
+    <ExcelImportPreviewDialog Visible="@showImportPreview"
+                              FileName="@importPreviewFileName"
+                              SheetName="@importPreviewSheetName"
+                              ColumnHeaders="@ImportPreviewHeaders"
+                              Rows="@importPreviewRows"
+                              IsApplying="@isApplyingImport"
+                              OnClose="CloseImportPreview"
+                              OnConfirm="ApplyImportAsync" />
 
     <div class="warehouse-user-layout @(IsFormVisible ? string.Empty : "warehouse-user-layout--single")">
         <section class="card card--list">
@@ -176,12 +209,21 @@
     private KhoUserUpsertVm formModel = new();
     private bool isLoading = true;
     private bool isSaving;
+    private bool isImporting;
+    private bool isApplyingImport;
+    private int importFileInputVersion;
+    private bool showImportPreview;
+    private string importPreviewFileName = string.Empty;
+    private string importPreviewSheetName = string.Empty;
+    private List<ExcelImportPreviewRow> importPreviewRows = [];
+    private List<ExcelImportRow> importSourceRows = [];
     private string? pageMessage;
     private bool pageMessageIsError;
     private string? formMessage;
     private bool formMessageIsError;
     private string searchKeyword = string.Empty;
     private FormMode currentFormMode = FormMode.None;
+    private static readonly IReadOnlyList<string> ImportPreviewHeaders = ["Mã đăng nhập", "Kho"];
 
     private bool IsFormVisible => currentFormMode != FormMode.None;
     private bool IsEditing => currentFormMode == FormMode.Edit;
@@ -390,6 +432,230 @@
         formModel.Ma_Dang_Nhap = args.Value?.ToString() ?? string.Empty;
     }
 
+    private async Task ExportTemplateAsync()
+    {
+        try
+        {
+            var bytes = ExcelWorkbookHelper.CreateTemplate(
+                "KhoUser",
+                ["Mã đăng nhập", "Kho"],
+                []);
+
+            await DownloadExcelAsync("kho-user-template.xlsx", bytes);
+            pageMessage = "Đã xuất file mẫu phân quyền kho-user.";
+            pageMessageIsError = false;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Export KhoUser template failed.");
+            pageMessage = "Không thể xuất file mẫu phân quyền kho-user.";
+            pageMessageIsError = true;
+        }
+    }
+
+    private async Task ImportExcelAsync(InputFileChangeEventArgs args)
+    {
+        var file = args.File;
+        if (file is null)
+        {
+            return;
+        }
+
+        if (!file.Name.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
+        {
+            pageMessage = "Chỉ hỗ trợ file Excel định dạng .xlsx.";
+            pageMessageIsError = true;
+            return;
+        }
+
+        isImporting = true;
+        ClearPageMessage();
+        ClearFormMessage();
+
+        try
+        {
+            await using var stream = file.OpenReadStream(10 * 1024 * 1024);
+            var readResult = await ExcelWorkbookHelper.ReadRowsWithContextAsync(stream);
+            var rows = readResult.Rows;
+            if (rows.Count == 0)
+            {
+                pageMessage = "File Excel không có dữ liệu để nhập.";
+                pageMessageIsError = true;
+                return;
+            }
+
+            var khoByName = khoOptions
+                .GroupBy(x => x.Ten_Kho, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(x => x.Key, x => x.First(), StringComparer.OrdinalIgnoreCase);
+
+            var existingPairs = items
+                .Where(x => !string.IsNullOrWhiteSpace(x.Ma_Dang_Nhap) && !string.IsNullOrWhiteSpace(x.Ten_Kho))
+                .Select(x => $"{x.Ma_Dang_Nhap.Trim().ToUpperInvariant()}|{x.Ten_Kho.Trim().ToUpperInvariant()}")
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            importPreviewFileName = file.Name;
+            importPreviewSheetName = string.IsNullOrWhiteSpace(readResult.SheetName) ? "Sheet1" : readResult.SheetName;
+            importSourceRows = rows.ToList();
+            importPreviewRows = BuildImportPreviewRows(rows, khoByName, existingPairs);
+            showImportPreview = true;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Import KhoUser from Excel failed.");
+            pageMessage = $"Không thể nhập file Excel phân quyền kho-user: {ex.Message}";
+            pageMessageIsError = true;
+        }
+        finally
+        {
+            isImporting = false;
+            importFileInputVersion++;
+        }
+    }
+
+    private async Task ApplyImportAsync()
+    {
+        var candidates = importPreviewRows
+            .Where(x => x.CanImport)
+            .ToList();
+
+        if (candidates.Count == 0)
+        {
+            pageMessage = "Không có dòng hợp lệ để nhập.";
+            pageMessageIsError = true;
+            return;
+        }
+
+        isApplyingImport = true;
+        ClearPageMessage();
+        ClearFormMessage();
+
+        try
+        {
+            var khoByName = khoOptions
+                .GroupBy(x => x.Ten_Kho, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(x => x.Key, x => x.First(), StringComparer.OrdinalIgnoreCase);
+
+            var successCount = 0;
+            var skippedDuplicates = new List<string>();
+            var errors = new List<string>();
+
+            foreach (var preview in candidates)
+            {
+                if (preview.SourceIndex < 0 || preview.SourceIndex >= importSourceRows.Count)
+                {
+                    continue;
+                }
+
+                var row = importSourceRows[preview.SourceIndex];
+                var maDangNhap = row.Get("Mã đăng nhập").Trim();
+                var tenKho = row.Get("Kho").Trim();
+
+                if (!khoByName.TryGetValue(tenKho, out var kho))
+                {
+                    errors.Add($"Dòng {row.RowNumber}: Không tìm thấy kho '{tenKho}'.");
+                    continue;
+                }
+
+                var result = await KhoUserService.CreateAsync(new KhoUserUpsertVm
+                {
+                    Ma_Dang_Nhap = maDangNhap,
+                    Kho_ID = kho.Kho_ID
+                });
+
+                if (result.Success)
+                {
+                    successCount++;
+                }
+                else if (IsDuplicateImportMessage(result.Message))
+                {
+                    skippedDuplicates.Add($"Dòng {row.RowNumber}: {result.Message}");
+                }
+                else
+                {
+                    errors.Add($"Dòng {row.RowNumber}: {result.Message}");
+                }
+            }
+
+            await LoadDataAsync();
+            pageMessage = BuildImportSummary(successCount, skippedDuplicates, errors);
+            pageMessageIsError = errors.Count > 0;
+            CloseImportPreview();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Apply KhoUser import failed.");
+            pageMessage = $"Không thể nhập dữ liệu từ file Excel: {ex.Message}";
+            pageMessageIsError = true;
+        }
+        finally
+        {
+            isApplyingImport = false;
+        }
+    }
+
+    private void CloseImportPreview()
+    {
+        showImportPreview = false;
+        importPreviewFileName = string.Empty;
+        importPreviewSheetName = string.Empty;
+        importPreviewRows = [];
+        importSourceRows = [];
+    }
+
+    private static List<ExcelImportPreviewRow> BuildImportPreviewRows(
+        IReadOnlyList<ExcelImportRow> rows,
+        IReadOnlyDictionary<string, KhoListItemVm> khoByName,
+        ISet<string> existingPairs)
+    {
+        var previewRows = new List<ExcelImportPreviewRow>(rows.Count);
+        var filePairs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        for (var index = 0; index < rows.Count; index++)
+        {
+            var row = rows[index];
+            var maDangNhap = row.Get("Mã đăng nhập").Trim();
+            var tenKho = row.Get("Kho").Trim();
+
+            var status = ExcelImportPreviewStatus.Valid;
+            var message = string.Empty;
+
+            if (string.IsNullOrWhiteSpace(maDangNhap) || string.IsNullOrWhiteSpace(tenKho))
+            {
+                status = ExcelImportPreviewStatus.Error;
+                message = "Mã đăng nhập và tên kho là bắt buộc.";
+            }
+            else if (!khoByName.ContainsKey(tenKho))
+            {
+                status = ExcelImportPreviewStatus.Error;
+                message = $"Không tìm thấy kho '{tenKho}'.";
+            }
+            else
+            {
+                var pairKey = $"{maDangNhap.ToUpperInvariant()}|{tenKho.ToUpperInvariant()}";
+                if (!filePairs.Add(pairKey))
+                {
+                    status = ExcelImportPreviewStatus.Warning;
+                    message = "Dòng phân quyền bị trùng trong file.";
+                }
+                else if (existingPairs.Contains(pairKey))
+                {
+                    status = ExcelImportPreviewStatus.Warning;
+                    message = "Phân quyền kho-user đã tồn tại.";
+                }
+            }
+
+            previewRows.Add(new ExcelImportPreviewRow(
+                DisplayIndex: index + 1,
+                SourceIndex: index,
+                ExcelRowNumber: row.RowNumber,
+                Cells: [maDangNhap, tenKho],
+                Status: status,
+                Message: message));
+        }
+
+        return previewRows;
+    }
+
     private void ClearPageMessage()
     {
         pageMessage = null;
@@ -406,6 +672,63 @@
     {
         return !string.IsNullOrWhiteSpace(source)
                && source.Contains(keyword, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task DownloadExcelAsync(string fileName, byte[] bytes)
+    {
+        await JS.InvokeVoidAsync(
+            "blazorFileDownload.downloadFileFromBase64",
+            fileName,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            Convert.ToBase64String(bytes));
+    }
+
+    private static bool IsDuplicateImportMessage(string? message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return false;
+        }
+
+        return message.Contains("đã tồn tại", StringComparison.OrdinalIgnoreCase)
+               || message.Contains("bị trùng", StringComparison.OrdinalIgnoreCase)
+               || message.Contains("đã được", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string BuildImportSummary(
+        int successCount,
+        IReadOnlyList<string> skippedDuplicates,
+        IReadOnlyList<string> errors)
+    {
+        if (errors.Count == 0 && skippedDuplicates.Count == 0)
+        {
+            return $"Nhập Excel thành công {successCount} dòng.";
+        }
+
+        if (errors.Count == 0 && skippedDuplicates.Count > 0)
+        {
+            var skippedText = string.Join(" | ", skippedDuplicates.Take(3));
+            if (skippedDuplicates.Count > 3)
+            {
+                skippedText += $" | ... thêm {skippedDuplicates.Count - 3} dòng trùng.";
+            }
+
+            return $"Đã nhập {successCount} dòng. Bỏ qua {skippedDuplicates.Count} dòng trùng: {skippedText}";
+        }
+
+        var firstErrors = string.Join(" | ", errors.Take(3));
+        if (errors.Count > 3)
+        {
+            firstErrors += $" | ... thêm {errors.Count - 3} lỗi.";
+        }
+
+        var summary = $"Đã nhập {successCount} dòng. Có {errors.Count} lỗi: {firstErrors}";
+        if (skippedDuplicates.Count > 0)
+        {
+            summary += $" | Bỏ qua {skippedDuplicates.Count} dòng trùng.";
+        }
+
+        return summary;
     }
 
     private enum FormMode

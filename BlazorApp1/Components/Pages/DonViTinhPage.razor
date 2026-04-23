@@ -1,6 +1,9 @@
 @page "/"
 @page "/danh-muc/don-vi-tinh"
 @rendermode InteractiveServer
+@using System.Globalization
+@using System.Text
+@using BlazorApp1.Infrastructure.Excel
 @using BlazorApp1.Models.DonViTinh
 @using BlazorApp1.Services.Interfaces
 @inject IDonViTinhService DonViTinhService
@@ -16,15 +19,158 @@
 
     <header class="page-header">
         <h1>Đơn vị tính</h1>
-        <button type="button" class="app-button app-button--primary" @onclick="StartCreate" disabled="@isSaving">
-            Thêm mới
-        </button>
+        <div class="page-header__actions">
+            <button type="button" class="app-button" style="display:inline-flex;align-items:center;justify-content:center;gap:0.42rem;box-sizing:border-box;width:150px;min-width:150px;max-width:150px;white-space:nowrap;background:#ffffff;border:1px solid #6dc7bf;color:#0f8b84;" @onclick="ExportTemplateAsync" disabled="@(isSaving || isImporting || isApplyingImport)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 3v12" />
+                    <path d="m7 10 5 5 5-5" />
+                    <path d="M5 21h14" />
+                </svg>
+                <span>Xuất file mẫu</span>
+            </button>
+            <label class="app-button" style="position:relative;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;gap:0.42rem;box-sizing:border-box;width:150px;min-width:150px;max-width:150px;white-space:nowrap;background:#ffffff;border:1px solid #6dc7bf;color:#0f8b84;@(isSaving || isImporting || isApplyingImport ? "pointer-events:none;opacity:0.65;cursor:wait;" : "cursor:pointer;")">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 21V9" />
+                    <path d="m17 14-5-5-5 5" />
+                    <path d="M5 3h14" />
+                </svg>
+                <span>Nhập file excel</span>
+                <InputFile style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;"
+                           @key="importFileInputVersion"
+                           OnChange="ImportExcelAsync"
+                           accept=".xlsx"
+                           disabled="@(isSaving || isImporting || isApplyingImport)" />
+            </label>
+            <button type="button" class="app-button app-button--primary" @onclick="StartCreate" disabled="@(isSaving || isImporting || isApplyingImport)">
+                Thêm mới
+            </button>
+        </div>
     </header>
 
     @if (!string.IsNullOrWhiteSpace(pageMessage))
     {
         <div class="status-banner @(pageMessageIsError ? "status-banner--error" : "status-banner--success")" role="alert">
             @pageMessage
+        </div>
+    }
+
+    @if (showImportPreview)
+    {
+        <div class="excel-preview-overlay" role="dialog" aria-modal="true" @onclick="CloseImportPreview">
+            <section class="excel-preview-dialog" @onclick:stopPropagation="true">
+                <header class="excel-preview-dialog__head">
+                    <div>
+                        <h2>Xem trước dữ liệu nhập từ Excel</h2>
+                        <p>Kiểm tra dữ liệu trước khi nhập vào hệ thống</p>
+                    </div>
+                    <button type="button" class="excel-preview-dialog__close" @onclick="CloseImportPreview" aria-label="Đóng">
+                        ×
+                    </button>
+                </header>
+
+                <section class="excel-preview-meta">
+                    <div class="excel-preview-file">
+                        <div class="excel-preview-file__icon" aria-hidden="true">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                                <path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7l-5-5Z" fill="#107C41"></path>
+                                <path d="M14 2v5h5" fill="#0B5E31"></path>
+                                <path d="m9 16 1.6-2.4L9.1 11h1.5l.8 1.5.8-1.5h1.5l-1.5 2.6 1.6 2.4h-1.6l-.9-1.6-.9 1.6H9Z" fill="#fff"></path>
+                            </svg>
+                        </div>
+                        <div class="excel-preview-file__content">
+                            <strong>@importPreviewFileName</strong>
+                            <span>Sheet: @importPreviewSheetName</span>
+                        </div>
+                    </div>
+
+                    <div class="excel-preview-counter">
+                        <span class="excel-preview-counter__label">Tổng số dòng</span>
+                        <strong class="excel-preview-counter__value excel-preview-counter__value--total">@ImportTotalRows</strong>
+                    </div>
+                    <div class="excel-preview-counter">
+                        <span class="excel-preview-counter__label">Dòng hợp lệ</span>
+                        <strong class="excel-preview-counter__value excel-preview-counter__value--success">@ImportValidRows</strong>
+                    </div>
+                    <div class="excel-preview-counter">
+                        <span class="excel-preview-counter__label">Dòng lỗi</span>
+                        <strong class="excel-preview-counter__value excel-preview-counter__value--error">@ImportErrorRows</strong>
+                    </div>
+                </section>
+
+                <section class="excel-preview-tools">
+                    <label class="excel-preview-search">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <path d="m21 21-4.3-4.3"></path>
+                        </svg>
+                        <input value="@importPreviewSearchKeyword"
+                               @oninput="HandleImportPreviewSearchInput"
+                               placeholder="Tìm trong dữ liệu xem trước" />
+                    </label>
+
+                    <label class="excel-preview-toggle">
+                        <input type="checkbox" checked="@importPreviewOnlyError" @onchange="HandleImportPreviewOnlyErrorChanged" />
+                        <span class="excel-preview-toggle__switch" aria-hidden="true"></span>
+                        <span class="excel-preview-toggle__label">Chỉ hiện dòng lỗi</span>
+                    </label>
+                </section>
+
+                <div class="excel-preview-table-wrap">
+                    <table class="excel-preview-table">
+                        <thead>
+                            <tr>
+                                <th>STT</th>
+                                <th>TÊN</th>
+                                <th>GHI CHÚ</th>
+                                <th>TRẠNG THÁI</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (FilteredImportPreviewRows.Count == 0)
+                            {
+                                <tr>
+                                    <td colspan="4" class="excel-preview-table__empty">Không có dữ liệu phù hợp bộ lọc.</td>
+                                </tr>
+                            }
+                            else
+                            {
+                                @foreach (var row in FilteredImportPreviewRows)
+                                {
+                                    <tr class="@GetImportPreviewRowClass(row)">
+                                        <td>@row.DisplayIndex</td>
+                                        <td class="@GetImportPreviewNameClass(row)">@GetImportPreviewNameText(row)</td>
+                                        <td class="@GetImportPreviewNoteClass(row)">@GetImportPreviewNoteText(row)</td>
+                                        <td>
+                                            <span class="@GetImportPreviewStatusTagClass(row)">@GetImportPreviewStatusLabel(row)</span>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <footer class="excel-preview-footer">
+                    <div class="excel-preview-footer__tips">
+                        <span class="excel-preview-footer__tips-icon" aria-hidden="true">i</span>
+                        <div class="excel-preview-footer__tips-lines">
+                            <div>• Dòng lỗi sẽ không được nhập</div>
+                            <div>• Có thể tiếp tục nhập các dòng hợp lệ</div>
+                        </div>
+                    </div>
+                    <div class="excel-preview-footer__actions">
+                        <button type="button" class="app-button app-button--secondary excel-preview-footer__btn excel-preview-footer__btn--cancel" @onclick="CloseImportPreview" disabled="@isApplyingImport">
+                            Hủy
+                        </button>
+                        <button type="button"
+                                class="app-button app-button--primary excel-preview-footer__btn excel-preview-footer__btn--confirm"
+                                @onclick="ApplyImportAsync"
+                                disabled="@(isApplyingImport || ImportValidRows == 0)">
+                            @(isApplyingImport ? "Đang nhập..." : $"Nhập dữ liệu ({ImportValidRows} dòng hợp lệ)")
+                        </button>
+                    </div>
+                </footer>
+            </section>
         </div>
     }
 
@@ -181,11 +327,20 @@
     private DonViTinhUpsertVm formModel = new();
     private bool isLoading = true;
     private bool isSaving;
+    private bool isImporting;
+    private bool isApplyingImport;
     private string? pageMessage;
     private bool pageMessageIsError;
     private string? formMessage;
     private bool formMessageIsError;
     private string searchKeyword = string.Empty;
+    private bool showImportPreview;
+    private string importPreviewFileName = string.Empty;
+    private string importPreviewSheetName = string.Empty;
+    private string importPreviewSearchKeyword = string.Empty;
+    private bool importPreviewOnlyError;
+    private List<ImportPreviewRow> importPreviewRows = [];
+    private int importFileInputVersion;
     private FormMode currentFormMode = FormMode.None;
 
     private bool IsFormVisible => currentFormMode != FormMode.None;
@@ -202,16 +357,52 @@
                 return items;
             }
 
-            var keyword = searchKeyword.Trim();
+            var normalizedKeyword = NormalizeForSearch(searchKeyword);
+            if (string.IsNullOrWhiteSpace(normalizedKeyword))
+            {
+                return items;
+            }
+
+            var keywords = normalizedKeyword
+                .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
             // Loc tren bo nho de cap nhat UI tuc thi theo oninput, khong tao round-trip DB cho moi ky tu.
             return items
-                .Where(x =>
-                    ContainsKeyword(x.Ten_Don_Vi_Tinh, keyword)
-                    || ContainsKeyword(x.Ghi_Chu, keyword))
+                .Where(x => MatchesKeywords(x, keywords))
                 .ToList();
         }
     }
+
+    private IReadOnlyList<ImportPreviewRow> FilteredImportPreviewRows
+    {
+        get
+        {
+            IEnumerable<ImportPreviewRow> query = importPreviewRows;
+
+            if (importPreviewOnlyError)
+            {
+                query = query.Where(x => x.Status == ImportPreviewStatus.Error);
+            }
+
+            if (!string.IsNullOrWhiteSpace(importPreviewSearchKeyword))
+            {
+                var normalizedKeyword = NormalizeForSearch(importPreviewSearchKeyword);
+                var keywords = normalizedKeyword
+                    .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+                if (keywords.Length > 0)
+                {
+                    query = query.Where(x => MatchesImportPreviewKeywords(x, keywords));
+                }
+            }
+
+            return query.ToList();
+        }
+    }
+
+    private int ImportTotalRows => importPreviewRows.Count;
+    private int ImportValidRows => importPreviewRows.Count(x => x.CanImport);
+    private int ImportErrorRows => importPreviewRows.Count(x => x.Status == ImportPreviewStatus.Error);
 
     protected override async Task OnInitializedAsync()
     {
@@ -390,10 +581,420 @@
         formModel.Ghi_Chu = args.Value?.ToString();
     }
 
-    private static bool ContainsKeyword(string? source, string keyword)
+    private async Task ExportTemplateAsync()
     {
-        return !string.IsNullOrWhiteSpace(source)
-               && source.Contains(keyword, StringComparison.OrdinalIgnoreCase);
+        try
+        {
+            var bytes = ExcelWorkbookHelper.CreateTemplate(
+                "DonViTinh",
+                ["Tên", "Ghi chú"],
+                []);
+
+            await DownloadExcelAsync("don-vi-tinh-template.xlsx", bytes);
+            pageMessage = "Đã xuất file mẫu đơn vị tính.";
+            pageMessageIsError = false;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Export DonViTinh template failed.");
+            pageMessage = "Không thể xuất file mẫu đơn vị tính.";
+            pageMessageIsError = true;
+        }
+    }
+
+    private async Task ImportExcelAsync(InputFileChangeEventArgs args)
+    {
+        var file = args.File;
+        if (file is null)
+        {
+            return;
+        }
+
+        if (!file.Name.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
+        {
+            pageMessage = "Chỉ hỗ trợ file Excel định dạng .xlsx.";
+            pageMessageIsError = true;
+            return;
+        }
+
+        isImporting = true;
+        ClearPageMessage();
+        ClearFormMessage();
+
+        try
+        {
+            await using var stream = file.OpenReadStream(10 * 1024 * 1024);
+            var readResult = await ExcelWorkbookHelper.ReadRowsWithContextAsync(stream);
+            var rows = readResult.Rows;
+            if (rows.Count == 0)
+            {
+                pageMessage = "File Excel không có dữ liệu để nhập.";
+                pageMessageIsError = true;
+                return;
+            }
+
+            importPreviewFileName = file.Name;
+            importPreviewSheetName = string.IsNullOrWhiteSpace(readResult.SheetName) ? "Sheet1" : readResult.SheetName;
+            importPreviewSearchKeyword = string.Empty;
+            importPreviewOnlyError = false;
+            importPreviewRows = BuildImportPreviewRows(rows);
+            showImportPreview = true;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Import DonViTinh from Excel failed.");
+            pageMessage = $"Không thể nhập file Excel đơn vị tính: {ex.Message}";
+            pageMessageIsError = true;
+        }
+        finally
+        {
+            isImporting = false;
+            importFileInputVersion++;
+        }
+    }
+
+    private async Task ApplyImportAsync()
+    {
+        var candidates = importPreviewRows
+            .Where(x => x.CanImport)
+            .ToList();
+        if (candidates.Count == 0)
+        {
+            pageMessage = "Không có dòng hợp lệ để nhập.";
+            pageMessageIsError = true;
+            return;
+        }
+
+        isApplyingImport = true;
+        ClearPageMessage();
+        ClearFormMessage();
+
+        try
+        {
+            var successCount = 0;
+            var skippedDuplicates = new List<string>();
+            var errors = new List<string>();
+
+            foreach (var row in candidates)
+            {
+                var result = await DonViTinhService.CreateAsync(new DonViTinhUpsertVm
+                {
+                    Ten_Don_Vi_Tinh = row.TenDonViTinh,
+                    Ghi_Chu = row.GhiChu
+                });
+
+                if (result.Success)
+                {
+                    successCount++;
+                }
+                else if (IsDuplicateImportMessage(result.Message))
+                {
+                    skippedDuplicates.Add($"Dòng {row.ExcelRowNumber}: {result.Message}");
+                }
+                else
+                {
+                    errors.Add($"Dòng {row.ExcelRowNumber}: {result.Message}");
+                }
+            }
+
+            await LoadDataAsync();
+            pageMessage = BuildImportSummary(successCount, skippedDuplicates, errors);
+            pageMessageIsError = errors.Count > 0;
+            CloseImportPreview();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Apply DonViTinh import failed.");
+            pageMessage = "Không thể nhập dữ liệu từ file Excel.";
+            pageMessageIsError = true;
+        }
+        finally
+        {
+            isApplyingImport = false;
+        }
+    }
+
+    private void CloseImportPreview()
+    {
+        showImportPreview = false;
+        importPreviewFileName = string.Empty;
+        importPreviewSheetName = string.Empty;
+        importPreviewSearchKeyword = string.Empty;
+        importPreviewOnlyError = false;
+        importPreviewRows = [];
+    }
+
+    private void HandleImportPreviewSearchInput(ChangeEventArgs args)
+    {
+        importPreviewSearchKeyword = args.Value?.ToString() ?? string.Empty;
+    }
+
+    private void HandleImportPreviewOnlyErrorChanged(ChangeEventArgs args)
+    {
+        importPreviewOnlyError = args.Value switch
+        {
+            bool value => value,
+            string text when bool.TryParse(text, out var parsed) => parsed,
+            _ => false
+        };
+    }
+
+    private List<ImportPreviewRow> BuildImportPreviewRows(IReadOnlyList<ExcelImportRow> rows)
+    {
+        var previewRows = new List<ImportPreviewRow>(rows.Count);
+        var fileNameSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var existingNameSet = items
+            .Select(x => NormalizeNameForCompare(x.Ten_Don_Vi_Tinh))
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        for (var index = 0; index < rows.Count; index++)
+        {
+            var row = rows[index];
+            var ten = row.Get("Tên").Trim();
+            var ghiChuRaw = row.Get("Ghi chú").Trim();
+            var ghiChu = string.IsNullOrWhiteSpace(ghiChuRaw) ? null : ghiChuRaw;
+
+            var status = ImportPreviewStatus.Valid;
+            var message = string.Empty;
+
+            if (string.IsNullOrWhiteSpace(ten))
+            {
+                status = ImportPreviewStatus.Error;
+                message = "Thiếu tên đơn vị tính";
+            }
+            else if (ten.Length > 100)
+            {
+                status = ImportPreviewStatus.Error;
+                message = "Tên đơn vị tính tối đa 100 ký tự";
+            }
+            else if (!string.IsNullOrWhiteSpace(ghiChuRaw) && ghiChuRaw.Length > 255)
+            {
+                status = ImportPreviewStatus.Error;
+                message = "Ghi chú tối đa 255 ký tự";
+            }
+            else
+            {
+                var normalizedName = NormalizeNameForCompare(ten);
+
+                if (!fileNameSet.Add(normalizedName))
+                {
+                    status = ImportPreviewStatus.Warning;
+                    message = "Trùng tên đơn vị tính trong file";
+                }
+                else if (existingNameSet.Contains(normalizedName))
+                {
+                    status = ImportPreviewStatus.Warning;
+                    message = "Tên đơn vị tính đã tồn tại";
+                }
+            }
+
+            previewRows.Add(new ImportPreviewRow(
+                DisplayIndex: index + 1,
+                ExcelRowNumber: row.RowNumber,
+                TenDonViTinh: ten,
+                GhiChu: ghiChu,
+                Status: status,
+                Message: message));
+        }
+
+        return previewRows;
+    }
+
+    private static bool MatchesImportPreviewKeywords(ImportPreviewRow row, IReadOnlyList<string> keywords)
+    {
+        var normalizedSource = NormalizeForSearch($"{row.TenDonViTinh} {row.GhiChu} {row.Message}");
+        return keywords.All(normalizedSource.Contains);
+    }
+
+    private static string NormalizeNameForCompare(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var normalized = value
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        return string.Join(" ", normalized).ToUpperInvariant();
+    }
+
+    private static string GetImportPreviewRowClass(ImportPreviewRow row)
+    {
+        return row.Status switch
+        {
+            ImportPreviewStatus.Error => "excel-preview-table__row excel-preview-table__row--error",
+            ImportPreviewStatus.Warning => "excel-preview-table__row excel-preview-table__row--warning",
+            _ => "excel-preview-table__row"
+        };
+    }
+
+    private static string GetImportPreviewNameClass(ImportPreviewRow row)
+    {
+        return row.Status == ImportPreviewStatus.Error ? "excel-preview-table__name excel-preview-table__name--error" : "excel-preview-table__name";
+    }
+
+    private static string GetImportPreviewNameText(ImportPreviewRow row)
+    {
+        return string.IsNullOrWhiteSpace(row.TenDonViTinh) ? "(trống)" : row.TenDonViTinh;
+    }
+
+    private static string GetImportPreviewNoteClass(ImportPreviewRow row)
+    {
+        return row.Status switch
+        {
+            ImportPreviewStatus.Error => "excel-preview-table__note excel-preview-table__note--error",
+            ImportPreviewStatus.Warning => "excel-preview-table__note excel-preview-table__note--warning",
+            _ when string.IsNullOrWhiteSpace(row.GhiChu) => "excel-preview-table__note excel-preview-table__note--muted",
+            _ => "excel-preview-table__note"
+        };
+    }
+
+    private static string GetImportPreviewNoteText(ImportPreviewRow row)
+    {
+        return row.Status switch
+        {
+            ImportPreviewStatus.Error => row.Message,
+            ImportPreviewStatus.Warning => row.Message,
+            _ => string.IsNullOrWhiteSpace(row.GhiChu) ? "Trống" : row.GhiChu
+        };
+    }
+
+    private static string GetImportPreviewStatusTagClass(ImportPreviewRow row)
+    {
+        return row.Status switch
+        {
+            ImportPreviewStatus.Error => "excel-preview-status excel-preview-status--error",
+            ImportPreviewStatus.Warning => "excel-preview-status excel-preview-status--warning",
+            _ => "excel-preview-status excel-preview-status--success"
+        };
+    }
+
+    private static string GetImportPreviewStatusLabel(ImportPreviewRow row)
+    {
+        return row.Status switch
+        {
+            ImportPreviewStatus.Error => "Lỗi",
+            ImportPreviewStatus.Warning => "Cảnh báo",
+            _ => "Hợp lệ"
+        };
+    }
+
+    private static bool MatchesKeywords(DonViTinhListItemVm item, IReadOnlyList<string> keywords)
+    {
+        if (keywords.Count == 0)
+        {
+            return true;
+        }
+
+        var searchIndex = NormalizeForSearch($"{item.Ten_Don_Vi_Tinh} {item.Ghi_Chu}");
+        if (string.IsNullOrWhiteSpace(searchIndex))
+        {
+            return false;
+        }
+
+        return keywords.All(searchIndex.Contains);
+    }
+
+    private static string NormalizeForSearch(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var normalized = value.Normalize(NormalizationForm.FormD);
+        var result = new StringBuilder(normalized.Length);
+        var previousWhiteSpace = false;
+
+        foreach (var ch in normalized)
+        {
+            var unicodeCategory = CharUnicodeInfo.GetUnicodeCategory(ch);
+            if (unicodeCategory == UnicodeCategory.NonSpacingMark)
+            {
+                continue;
+            }
+
+            var loweredChar = char.ToLowerInvariant(ch);
+            if (loweredChar == 'đ')
+            {
+                loweredChar = 'd';
+            }
+
+            if (char.IsWhiteSpace(loweredChar))
+            {
+                if (previousWhiteSpace)
+                {
+                    continue;
+                }
+
+                result.Append(' ');
+                previousWhiteSpace = true;
+                continue;
+            }
+
+            result.Append(loweredChar);
+            previousWhiteSpace = false;
+        }
+
+        return result.ToString().Trim();
+    }
+
+    private async Task DownloadExcelAsync(string fileName, byte[] bytes)
+    {
+        await JS.InvokeVoidAsync(
+            "blazorFileDownload.downloadFileFromBase64",
+            fileName,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            Convert.ToBase64String(bytes));
+    }
+
+    private static bool IsDuplicateImportMessage(string? message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return false;
+        }
+
+        return message.Contains("đã tồn tại", StringComparison.OrdinalIgnoreCase)
+               || message.Contains("bị trùng", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string BuildImportSummary(
+        int successCount,
+        IReadOnlyList<string> skippedDuplicates,
+        IReadOnlyList<string> errors)
+    {
+        if (errors.Count == 0 && skippedDuplicates.Count == 0)
+        {
+            return $"Nhập Excel thành công {successCount} dòng.";
+        }
+
+        if (errors.Count == 0 && skippedDuplicates.Count > 0)
+        {
+            var skippedText = string.Join(" | ", skippedDuplicates.Take(3));
+            if (skippedDuplicates.Count > 3)
+            {
+                skippedText += $" | ... thêm {skippedDuplicates.Count - 3} dòng trùng.";
+            }
+
+            return $"Đã nhập {successCount} dòng. Bỏ qua {skippedDuplicates.Count} dòng trùng: {skippedText}";
+        }
+
+        var firstErrors = string.Join(" | ", errors.Take(3));
+        if (errors.Count > 3)
+        {
+            firstErrors += $" | ... thêm {errors.Count - 3} lỗi.";
+        }
+
+        var summary = $"Đã nhập {successCount} dòng. Có {errors.Count} lỗi: {firstErrors}";
+        if (skippedDuplicates.Count > 0)
+        {
+            summary += $" | Bỏ qua {skippedDuplicates.Count} dòng trùng.";
+        }
+
+        return summary;
     }
 
     private enum FormMode
@@ -401,6 +1002,24 @@
         None = 0,
         Create = 1,
         Edit = 2
+    }
+
+    private enum ImportPreviewStatus
+    {
+        Valid = 0,
+        Warning = 1,
+        Error = 2
+    }
+
+    private sealed record ImportPreviewRow(
+        int DisplayIndex,
+        int ExcelRowNumber,
+        string TenDonViTinh,
+        string? GhiChu,
+        ImportPreviewStatus Status,
+        string Message)
+    {
+        public bool CanImport => Status != ImportPreviewStatus.Error;
     }
 }
 

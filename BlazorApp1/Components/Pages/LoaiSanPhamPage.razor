@@ -1,5 +1,6 @@
 @page "/danh-muc/loai-san-pham"
 @rendermode InteractiveServer
+@using BlazorApp1.Infrastructure.Excel
 @using BlazorApp1.Models.LoaiSanPham
 @using BlazorApp1.Services.Interfaces
 @inject ILoaiSanPhamService LoaiSanPhamService
@@ -15,9 +16,32 @@
 
     <header class="page-header">
         <h1>Loại sản phẩm</h1>
-        <button type="button" class="app-button app-button--primary" @onclick="StartCreate" disabled="@isSaving">
-            Thêm mới
-        </button>
+        <div class="page-header__actions">
+            <button type="button" class="app-button" style="display:inline-flex;align-items:center;justify-content:center;gap:0.42rem;box-sizing:border-box;width:150px;min-width:150px;max-width:150px;white-space:nowrap;background:#ffffff;border:1px solid #6dc7bf;color:#0f8b84;" @onclick="ExportTemplateAsync" disabled="@(isSaving || isImporting || isApplyingImport)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 3v12" />
+                    <path d="m7 10 5 5 5-5" />
+                    <path d="M5 21h14" />
+                </svg>
+                <span>Xuất file mẫu</span>
+            </button>
+            <label class="app-button" style="position:relative;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;gap:0.42rem;box-sizing:border-box;width:150px;min-width:150px;max-width:150px;white-space:nowrap;background:#ffffff;border:1px solid #6dc7bf;color:#0f8b84;@(isSaving || isImporting || isApplyingImport ? "pointer-events:none;opacity:0.65;cursor:wait;" : "cursor:pointer;")">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 21V9" />
+                    <path d="m17 14-5-5-5 5" />
+                    <path d="M5 3h14" />
+                </svg>
+                <span>Nhập file excel</span>
+                <InputFile style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;"
+                           @key="importFileInputVersion"
+                           OnChange="ImportExcelAsync"
+                           accept=".xlsx"
+                           disabled="@(isSaving || isImporting || isApplyingImport)" />
+            </label>
+            <button type="button" class="app-button app-button--primary" @onclick="StartCreate" disabled="@(isSaving || isImporting || isApplyingImport)">
+                Thêm mới
+            </button>
+        </div>
     </header>
 
     @if (!string.IsNullOrWhiteSpace(pageMessage))
@@ -26,6 +50,15 @@
             @pageMessage
         </div>
     }
+
+    <ExcelImportPreviewDialog Visible="@showImportPreview"
+                              FileName="@importPreviewFileName"
+                              SheetName="@importPreviewSheetName"
+                              ColumnHeaders="@ImportPreviewHeaders"
+                              Rows="@importPreviewRows"
+                              IsApplying="@isApplyingImport"
+                              OnClose="CloseImportPreview"
+                              OnConfirm="ApplyImportAsync" />
 
     <div class="category-layout @(IsFormVisible ? string.Empty : "category-layout--single")">
         <section class="card card--list">
@@ -196,12 +229,21 @@
     private LoaiSanPhamUpsertVm formModel = new();
     private bool isLoading = true;
     private bool isSaving;
+    private bool isImporting;
+    private bool isApplyingImport;
+    private int importFileInputVersion;
+    private bool showImportPreview;
+    private string importPreviewFileName = string.Empty;
+    private string importPreviewSheetName = string.Empty;
+    private List<ExcelImportPreviewRow> importPreviewRows = [];
+    private List<ExcelImportRow> importSourceRows = [];
     private string? pageMessage;
     private bool pageMessageIsError;
     private string? formMessage;
     private bool formMessageIsError;
     private string searchKeyword = string.Empty;
     private FormMode currentFormMode = FormMode.None;
+    private static readonly IReadOnlyList<string> ImportPreviewHeaders = ["Mã", "Tên", "Ghi chú"];
 
     private bool IsFormVisible => currentFormMode != FormMode.None;
     private bool IsEditing => currentFormMode == FormMode.Edit;
@@ -401,6 +443,192 @@
         formModel.Ghi_Chu = args.Value?.ToString();
     }
 
+    private async Task ExportTemplateAsync()
+    {
+        try
+        {
+            var bytes = ExcelWorkbookHelper.CreateTemplate(
+                "LoaiSanPham",
+                ["Mã", "Tên", "Ghi chú"],
+                []);
+
+            await DownloadExcelAsync("loai-san-pham-template.xlsx", bytes);
+            pageMessage = "Đã xuất file mẫu loại sản phẩm.";
+            pageMessageIsError = false;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Export LoaiSanPham template failed.");
+            pageMessage = "Không thể xuất file mẫu loại sản phẩm.";
+            pageMessageIsError = true;
+        }
+    }
+
+    private async Task ImportExcelAsync(InputFileChangeEventArgs args)
+    {
+        var file = args.File;
+        if (file is null)
+        {
+            return;
+        }
+
+        if (!file.Name.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
+        {
+            pageMessage = "Chỉ hỗ trợ file Excel định dạng .xlsx.";
+            pageMessageIsError = true;
+            return;
+        }
+
+        isImporting = true;
+        ClearPageMessage();
+        ClearFormMessage();
+
+        try
+        {
+            await using var stream = file.OpenReadStream(10 * 1024 * 1024);
+            var readResult = await ExcelWorkbookHelper.ReadRowsWithContextAsync(stream);
+            var rows = readResult.Rows;
+            if (rows.Count == 0)
+            {
+                pageMessage = "File Excel không có dữ liệu để nhập.";
+                pageMessageIsError = true;
+                return;
+            }
+
+            importPreviewFileName = file.Name;
+            importPreviewSheetName = string.IsNullOrWhiteSpace(readResult.SheetName) ? "Sheet1" : readResult.SheetName;
+            importSourceRows = rows.ToList();
+            importPreviewRows = BuildImportPreviewRows(rows);
+            showImportPreview = true;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Import LoaiSanPham from Excel failed.");
+            pageMessage = $"Không thể nhập file Excel loại sản phẩm: {ex.Message}";
+            pageMessageIsError = true;
+        }
+        finally
+        {
+            isImporting = false;
+            importFileInputVersion++;
+        }
+    }
+
+    private async Task ApplyImportAsync()
+    {
+        var candidates = importPreviewRows
+            .Where(x => x.CanImport)
+            .ToList();
+
+        if (candidates.Count == 0)
+        {
+            pageMessage = "Không có dòng hợp lệ để nhập.";
+            pageMessageIsError = true;
+            return;
+        }
+
+        isApplyingImport = true;
+        ClearPageMessage();
+        ClearFormMessage();
+
+        try
+        {
+            var successCount = 0;
+            var skippedDuplicates = new List<string>();
+            var errors = new List<string>();
+
+            foreach (var preview in candidates)
+            {
+                if (preview.SourceIndex < 0 || preview.SourceIndex >= importSourceRows.Count)
+                {
+                    continue;
+                }
+
+                var row = importSourceRows[preview.SourceIndex];
+                var ma = row.Get("Mã").Trim();
+                var ten = row.Get("Tên").Trim();
+                var ghiChuRaw = row.Get("Ghi chú").Trim();
+                var ghiChu = string.IsNullOrWhiteSpace(ghiChuRaw) ? null : ghiChuRaw;
+
+                var result = await LoaiSanPhamService.CreateAsync(new LoaiSanPhamUpsertVm
+                {
+                    Ma_LSP = ma,
+                    Ten_LSP = ten,
+                    Ghi_Chu = ghiChu
+                });
+
+                if (result.Success)
+                {
+                    successCount++;
+                }
+                else if (IsDuplicateImportMessage(result.Message))
+                {
+                    skippedDuplicates.Add($"Dòng {row.RowNumber}: {result.Message}");
+                }
+                else
+                {
+                    errors.Add($"Dòng {row.RowNumber}: {result.Message}");
+                }
+            }
+
+            await LoadDataAsync();
+            pageMessage = BuildImportSummary(successCount, skippedDuplicates, errors);
+            pageMessageIsError = errors.Count > 0;
+            CloseImportPreview();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Apply LoaiSanPham import failed.");
+            pageMessage = $"Không thể nhập dữ liệu từ file Excel: {ex.Message}";
+            pageMessageIsError = true;
+        }
+        finally
+        {
+            isApplyingImport = false;
+        }
+    }
+
+    private void CloseImportPreview()
+    {
+        showImportPreview = false;
+        importPreviewFileName = string.Empty;
+        importPreviewSheetName = string.Empty;
+        importPreviewRows = [];
+        importSourceRows = [];
+    }
+
+    private static List<ExcelImportPreviewRow> BuildImportPreviewRows(IReadOnlyList<ExcelImportRow> rows)
+    {
+        var previewRows = new List<ExcelImportPreviewRow>(rows.Count);
+
+        for (var index = 0; index < rows.Count; index++)
+        {
+            var row = rows[index];
+            var ma = row.Get("Mã").Trim();
+            var ten = row.Get("Tên").Trim();
+            var ghiChu = row.Get("Ghi chú").Trim();
+
+            var status = ExcelImportPreviewStatus.Valid;
+            var message = string.Empty;
+
+            if (string.IsNullOrWhiteSpace(ma) || string.IsNullOrWhiteSpace(ten))
+            {
+                status = ExcelImportPreviewStatus.Error;
+                message = "Mã và tên loại sản phẩm là bắt buộc.";
+            }
+
+            previewRows.Add(new ExcelImportPreviewRow(
+                DisplayIndex: index + 1,
+                SourceIndex: index,
+                ExcelRowNumber: row.RowNumber,
+                Cells: [ma, ten, ghiChu],
+                Status: status,
+                Message: message));
+        }
+
+        return previewRows;
+    }
+
     private void ClearPageMessage()
     {
         pageMessage = null;
@@ -417,6 +645,63 @@
     {
         return !string.IsNullOrWhiteSpace(source)
                && source.Contains(keyword, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task DownloadExcelAsync(string fileName, byte[] bytes)
+    {
+        await JS.InvokeVoidAsync(
+            "blazorFileDownload.downloadFileFromBase64",
+            fileName,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            Convert.ToBase64String(bytes));
+    }
+
+    private static bool IsDuplicateImportMessage(string? message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return false;
+        }
+
+        return message.Contains("đã tồn tại", StringComparison.OrdinalIgnoreCase)
+               || message.Contains("bị trùng", StringComparison.OrdinalIgnoreCase)
+               || message.Contains("đã được", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string BuildImportSummary(
+        int successCount,
+        IReadOnlyList<string> skippedDuplicates,
+        IReadOnlyList<string> errors)
+    {
+        if (errors.Count == 0 && skippedDuplicates.Count == 0)
+        {
+            return $"Nhập Excel thành công {successCount} dòng.";
+        }
+
+        if (errors.Count == 0 && skippedDuplicates.Count > 0)
+        {
+            var skippedText = string.Join(" | ", skippedDuplicates.Take(3));
+            if (skippedDuplicates.Count > 3)
+            {
+                skippedText += $" | ... thêm {skippedDuplicates.Count - 3} dòng trùng.";
+            }
+
+            return $"Đã nhập {successCount} dòng. Bỏ qua {skippedDuplicates.Count} dòng trùng: {skippedText}";
+        }
+
+        var firstErrors = string.Join(" | ", errors.Take(3));
+        if (errors.Count > 3)
+        {
+            firstErrors += $" | ... thêm {errors.Count - 3} lỗi.";
+        }
+
+        var summary = $"Đã nhập {successCount} dòng. Có {errors.Count} lỗi: {firstErrors}";
+        if (skippedDuplicates.Count > 0)
+        {
+            summary += $" | Bỏ qua {skippedDuplicates.Count} dòng trùng.";
+        }
+
+        return summary;
     }
 
     private enum FormMode

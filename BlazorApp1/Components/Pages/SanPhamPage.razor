@@ -1,5 +1,8 @@
 @page "/danh-muc/san-pham"
 @rendermode InteractiveServer
+@using System.Globalization
+@using System.Text
+@using BlazorApp1.Infrastructure.Excel
 @using BlazorApp1.Models.DonViTinh
 @using BlazorApp1.Models.LoaiSanPham
 @using BlazorApp1.Models.SanPham
@@ -19,9 +22,32 @@
 
     <header class="page-header">
         <h1>Sản phẩm</h1>
-        <button type="button" class="app-button app-button--primary" @onclick="StartCreate" disabled="@isSaving">
-            Thêm mới
-        </button>
+        <div class="page-header__actions">
+            <button type="button" class="app-button" style="display:inline-flex;align-items:center;justify-content:center;gap:0.42rem;box-sizing:border-box;width:150px;min-width:150px;max-width:150px;white-space:nowrap;background:#ffffff;border:1px solid #6dc7bf;color:#0f8b84;" @onclick="ExportTemplateAsync" disabled="@(isSaving || isImporting || isApplyingImport)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 3v12" />
+                    <path d="m7 10 5 5 5-5" />
+                    <path d="M5 21h14" />
+                </svg>
+                <span>Xuất file mẫu</span>
+            </button>
+            <label class="app-button" style="position:relative;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;gap:0.42rem;box-sizing:border-box;width:150px;min-width:150px;max-width:150px;white-space:nowrap;background:#ffffff;border:1px solid #6dc7bf;color:#0f8b84;@(isSaving || isImporting || isApplyingImport ? "pointer-events:none;opacity:0.65;cursor:wait;" : "cursor:pointer;")">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 21V9" />
+                    <path d="m17 14-5-5-5 5" />
+                    <path d="M5 3h14" />
+                </svg>
+                <span>Nhập file excel</span>
+                <InputFile style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;"
+                           @key="importFileInputVersion"
+                           OnChange="ImportExcelAsync"
+                           accept=".xlsx"
+                           disabled="@(isSaving || isImporting || isApplyingImport)" />
+            </label>
+            <button type="button" class="app-button app-button--primary" @onclick="StartCreate" disabled="@(isSaving || isImporting || isApplyingImport)">
+                Thêm mới
+            </button>
+        </div>
     </header>
 
     @if (!string.IsNullOrWhiteSpace(pageMessage))
@@ -30,6 +56,92 @@
             @pageMessage
         </div>
     }
+
+    <ExcelImportPreviewDialog Visible="@showImportPreview"
+                              FileName="@importPreviewFileName"
+                              SheetName="@importPreviewSheetName"
+                              ColumnHeaders="@ImportPreviewHeaders"
+                              Rows="@importPreviewRows"
+                              IsApplying="@isApplyingImport"
+                              OnClose="CloseImportPreview"
+                              OnConfirm="ApplyImportAsync">
+        <CellTemplate Context="cell">
+            @if (cell.CellIndex == 2)
+            {
+                var state = GetImportResolutionState(cell.Row.SourceIndex);
+                if (state is not null && state.ShouldRenderLoaiSanPhamCombo)
+                {
+                    <div class="import-preview-editor">
+                        <select class="import-preview-editor__select"
+                                value="@(state.SelectedLoaiSanPhamId?.ToString() ?? string.Empty)"
+                                @onchange="args => HandleLoaiSanPhamSelectionChanged(cell.Row.SourceIndex, args)"
+                                disabled="@(isApplyingImport || state.IsAddingLoaiSanPham)">
+                            <option value="">-- Chọn loại sản phẩm --</option>
+                            @foreach (var option in loaiSanPhamOptions)
+                            {
+                                <option value="@option.Loai_San_Pham_ID">@option.Ten_LSP (@option.Ma_LSP)</option>
+                            }
+                        </select>
+                        @if (!string.IsNullOrWhiteSpace(state.RawLoaiSanPham))
+                        {
+                            <div class="import-preview-editor__hint">
+                                Giá trị trong file: <strong>@state.RawLoaiSanPham</strong>
+                            </div>
+                            <button type="button"
+                                    class="import-preview-editor__button"
+                                    @onclick="() => AddMissingLoaiSanPhamAsync(cell.Row.SourceIndex)"
+                                    disabled="@(isApplyingImport || state.IsAddingLoaiSanPham)">
+                                @(state.IsAddingLoaiSanPham ? "Đang thêm..." : "Áp dụng thêm mới")
+                            </button>
+                        }
+                    </div>
+                }
+                else
+                {
+                    @GetDisplayCellText(cell.CellValue)
+                }
+            }
+            else if (cell.CellIndex == 3)
+            {
+                var state = GetImportResolutionState(cell.Row.SourceIndex);
+                if (state is not null && state.ShouldRenderDonViTinhCombo)
+                {
+                    <div class="import-preview-editor">
+                        <select class="import-preview-editor__select"
+                                value="@(state.SelectedDonViTinhId?.ToString() ?? string.Empty)"
+                                @onchange="args => HandleDonViTinhSelectionChanged(cell.Row.SourceIndex, args)"
+                                disabled="@(isApplyingImport || state.IsAddingDonViTinh)">
+                            <option value="">-- Chọn đơn vị tính --</option>
+                            @foreach (var option in donViTinhOptions)
+                            {
+                                <option value="@option.Don_Vi_Tinh_ID">@option.Ten_Don_Vi_Tinh</option>
+                            }
+                        </select>
+                        @if (!string.IsNullOrWhiteSpace(state.RawDonViTinh))
+                        {
+                            <div class="import-preview-editor__hint">
+                                Giá trị trong file: <strong>@state.RawDonViTinh</strong>
+                            </div>
+                            <button type="button"
+                                    class="import-preview-editor__button"
+                                    @onclick="() => AddMissingDonViTinhAsync(cell.Row.SourceIndex)"
+                                    disabled="@(isApplyingImport || state.IsAddingDonViTinh)">
+                                @(state.IsAddingDonViTinh ? "Đang thêm..." : "Áp dụng thêm mới")
+                            </button>
+                        }
+                    </div>
+                }
+                else
+                {
+                    @GetDisplayCellText(cell.CellValue)
+                }
+            }
+            else
+            {
+                @GetDisplayCellText(cell.CellValue)
+            }
+        </CellTemplate>
+    </ExcelImportPreviewDialog>
 
     <div class="product-layout @(IsFormVisible ? string.Empty : "product-layout--single")">
         <section class="card card--list">
@@ -238,12 +350,22 @@
     private SanPhamUpsertVm formModel = new();
     private bool isLoading = true;
     private bool isSaving;
+    private bool isImporting;
+    private bool isApplyingImport;
+    private int importFileInputVersion;
+    private bool showImportPreview;
+    private string importPreviewFileName = string.Empty;
+    private string importPreviewSheetName = string.Empty;
+    private List<ExcelImportPreviewRow> importPreviewRows = [];
+    private List<ExcelImportRow> importSourceRows = [];
+    private readonly Dictionary<int, SanPhamImportResolutionState> importResolutionBySourceIndex = [];
     private string? pageMessage;
     private bool pageMessageIsError;
     private string? formMessage;
     private bool formMessageIsError;
     private string searchKeyword = string.Empty;
     private FormMode currentFormMode = FormMode.None;
+    private static readonly IReadOnlyList<string> ImportPreviewHeaders = ["Mã", "Tên sản phẩm", "Loại sản phẩm", "Đơn vị tính", "Ghi chú"];
 
     private bool IsFormVisible => currentFormMode != FormMode.None;
     private bool IsEditing => currentFormMode == FormMode.Edit;
@@ -480,6 +602,612 @@
         formModel.Ghi_Chu = args.Value?.ToString();
     }
 
+    private async Task ExportTemplateAsync()
+    {
+        try
+        {
+            var bytes = ExcelWorkbookHelper.CreateTemplate(
+                "SanPham",
+                ["Mã", "Tên sản phẩm", "Loại sản phẩm", "Đơn vị tính", "Ghi chú"],
+                []);
+
+            await DownloadExcelAsync("san-pham-template.xlsx", bytes);
+            pageMessage = "Đã xuất file mẫu sản phẩm.";
+            pageMessageIsError = false;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Export SanPham template failed.");
+            pageMessage = "Không thể xuất file mẫu sản phẩm.";
+            pageMessageIsError = true;
+        }
+    }
+
+    private async Task ImportExcelAsync(InputFileChangeEventArgs args)
+    {
+        var file = args.File;
+        if (file is null)
+        {
+            return;
+        }
+
+        if (!file.Name.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
+        {
+            pageMessage = "Chỉ hỗ trợ file Excel định dạng .xlsx.";
+            pageMessageIsError = true;
+            return;
+        }
+
+        isImporting = true;
+        ClearPageMessage();
+        ClearFormMessage();
+
+        try
+        {
+            await using var stream = file.OpenReadStream(10 * 1024 * 1024);
+            var readResult = await ExcelWorkbookHelper.ReadRowsWithContextAsync(stream);
+            var rows = readResult.Rows;
+            if (rows.Count == 0)
+            {
+                pageMessage = "File Excel không có dữ liệu để nhập.";
+                pageMessageIsError = true;
+                return;
+            }
+
+            importPreviewFileName = file.Name;
+            importPreviewSheetName = string.IsNullOrWhiteSpace(readResult.SheetName) ? "Sheet1" : readResult.SheetName;
+            importSourceRows = rows.ToList();
+            importResolutionBySourceIndex.Clear();
+            RebuildSanPhamImportPreviewRows();
+            showImportPreview = true;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Import SanPham from Excel failed.");
+            pageMessage = $"Không thể nhập file Excel sản phẩm: {ex.Message}";
+            pageMessageIsError = true;
+        }
+        finally
+        {
+            isImporting = false;
+            importFileInputVersion++;
+        }
+    }
+
+    private async Task ApplyImportAsync()
+    {
+        RebuildSanPhamImportPreviewRows();
+
+        var skippedReasons = importPreviewRows
+            .Where(x => x.Status == ExcelImportPreviewStatus.Error)
+            .Select(x => $"Dòng {x.ExcelRowNumber}: {x.Message}")
+            .ToList();
+
+        var candidates = importPreviewRows
+            .Where(x => x.CanImport)
+            .ToList();
+
+        if (candidates.Count == 0)
+        {
+            pageMessage = skippedReasons.Count > 0
+                ? BuildImportSummary(0, skippedReasons)
+                : "Không có dòng hợp lệ để nhập.";
+            pageMessageIsError = true;
+            return;
+        }
+
+        isApplyingImport = true;
+        ClearPageMessage();
+        ClearFormMessage();
+
+        try
+        {
+            var successCount = 0;
+            var errors = new List<string>();
+
+            foreach (var preview in candidates)
+            {
+                if (preview.SourceIndex < 0 || preview.SourceIndex >= importSourceRows.Count)
+                {
+                    continue;
+                }
+
+                var row = importSourceRows[preview.SourceIndex];
+                var maSp = row.Get("Mã").Trim();
+                var tenSp = row.Get("Tên sản phẩm").Trim();
+                var ghiChuRaw = row.Get("Ghi chú").Trim();
+                var ghiChu = string.IsNullOrWhiteSpace(ghiChuRaw) ? null : ghiChuRaw;
+
+                if (!importResolutionBySourceIndex.TryGetValue(preview.SourceIndex, out var resolutionState))
+                {
+                    var errorDetail = $"Dòng {row.RowNumber}: Không tìm thấy cấu hình loại sản phẩm/đơn vị tính.";
+                    errors.Add(errorDetail);
+                    skippedReasons.Add(errorDetail);
+                    continue;
+                }
+
+                if (!resolutionState.SelectedLoaiSanPhamId.HasValue)
+                {
+                    var errorDetail = $"Dòng {row.RowNumber}: Chưa chọn loại sản phẩm.";
+                    errors.Add(errorDetail);
+                    skippedReasons.Add(errorDetail);
+                    continue;
+                }
+
+                if (!resolutionState.SelectedDonViTinhId.HasValue)
+                {
+                    var errorDetail = $"Dòng {row.RowNumber}: Chưa chọn đơn vị tính.";
+                    errors.Add(errorDetail);
+                    skippedReasons.Add(errorDetail);
+                    continue;
+                }
+
+                var result = await SanPhamService.CreateAsync(new SanPhamUpsertVm
+                {
+                    Ma_San_Pham = maSp,
+                    Ten_San_Pham = tenSp,
+                    Loai_San_Pham_ID = resolutionState.SelectedLoaiSanPhamId.Value,
+                    Don_Vi_Tinh_ID = resolutionState.SelectedDonViTinhId.Value,
+                    Ghi_Chu = ghiChu
+                });
+
+                if (result.Success)
+                {
+                    successCount++;
+                }
+                else if (IsDuplicateImportMessage(result.Message))
+                {
+                    skippedReasons.Add($"Dòng {row.RowNumber}: {result.Message}");
+                }
+                else
+                {
+                    var errorDetail = $"Dòng {row.RowNumber}: {result.Message}";
+                    errors.Add(errorDetail);
+                    skippedReasons.Add(errorDetail);
+                }
+            }
+
+            await LoadDataAsync();
+            pageMessage = BuildImportSummary(successCount, skippedReasons);
+            pageMessageIsError = errors.Count > 0;
+            CloseImportPreview();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Apply SanPham import failed.");
+            pageMessage = $"Không thể nhập dữ liệu từ file Excel: {ex.Message}";
+            pageMessageIsError = true;
+        }
+        finally
+        {
+            isApplyingImport = false;
+        }
+    }
+
+    private void CloseImportPreview()
+    {
+        showImportPreview = false;
+        importPreviewFileName = string.Empty;
+        importPreviewSheetName = string.Empty;
+        importPreviewRows = [];
+        importSourceRows = [];
+        importResolutionBySourceIndex.Clear();
+    }
+
+    private void RebuildSanPhamImportPreviewRows()
+    {
+        var lspByCode = loaiSanPhamOptions
+            .GroupBy(x => x.Ma_LSP, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(x => x.Key, x => x.First(), StringComparer.OrdinalIgnoreCase);
+
+        var lspByName = loaiSanPhamOptions
+            .GroupBy(x => x.Ten_LSP, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(x => x.Key, x => x.First(), StringComparer.OrdinalIgnoreCase);
+
+        var dvtByName = donViTinhOptions
+            .GroupBy(x => x.Ten_Don_Vi_Tinh, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(x => x.Key, x => x.First(), StringComparer.OrdinalIgnoreCase);
+
+        var existingProductCodes = items
+            .Select(x => x.Ma_San_Pham?.Trim())
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x!)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        importPreviewRows = BuildImportPreviewRows(importSourceRows, lspByCode, lspByName, dvtByName, existingProductCodes);
+    }
+
+    private List<ExcelImportPreviewRow> BuildImportPreviewRows(
+        IReadOnlyList<ExcelImportRow> rows,
+        IReadOnlyDictionary<string, LoaiSanPhamListItemVm> lspByCode,
+        IReadOnlyDictionary<string, LoaiSanPhamListItemVm> lspByName,
+        IReadOnlyDictionary<string, DonViTinhListItemVm> dvtByName,
+        ISet<string> existingProductCodes)
+    {
+        var previewRows = new List<ExcelImportPreviewRow>(rows.Count);
+        var fileCodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var lspById = loaiSanPhamOptions.ToDictionary(x => x.Loai_San_Pham_ID);
+        var dvtById = donViTinhOptions.ToDictionary(x => x.Don_Vi_Tinh_ID);
+
+        for (var index = 0; index < rows.Count; index++)
+        {
+            var row = rows[index];
+            var maSp = row.Get("Mã").Trim();
+            var tenSp = row.Get("Tên sản phẩm").Trim();
+            var loaiSanPhamInput = row.Get("Loại sản phẩm").Trim();
+            var tenDvt = row.Get("Đơn vị tính").Trim();
+            var ghiChu = row.Get("Ghi chú").Trim();
+
+            if (!importResolutionBySourceIndex.TryGetValue(index, out var state))
+            {
+                state = new SanPhamImportResolutionState();
+                importResolutionBySourceIndex[index] = state;
+            }
+
+            state.RawLoaiSanPham = loaiSanPhamInput;
+            state.RawDonViTinh = tenDvt;
+
+            LoaiSanPhamListItemVm? resolvedLoai = null;
+            DonViTinhListItemVm? resolvedDonViTinh = null;
+            var isLoaiResolvedFromFile = !string.IsNullOrWhiteSpace(loaiSanPhamInput)
+                                         && TryResolveLoaiSanPham(loaiSanPhamInput, lspByCode, lspByName, out resolvedLoai);
+            var isDonViTinhResolvedFromFile = !string.IsNullOrWhiteSpace(tenDvt)
+                                              && dvtByName.TryGetValue(tenDvt, out resolvedDonViTinh);
+
+            if (isLoaiResolvedFromFile && resolvedLoai is not null)
+            {
+                state.SelectedLoaiSanPhamId = resolvedLoai.Loai_San_Pham_ID;
+            }
+            else if (state.SelectedLoaiSanPhamId.HasValue && !lspById.ContainsKey(state.SelectedLoaiSanPhamId.Value))
+            {
+                state.SelectedLoaiSanPhamId = null;
+            }
+
+            if (isDonViTinhResolvedFromFile && resolvedDonViTinh is not null)
+            {
+                state.SelectedDonViTinhId = resolvedDonViTinh.Don_Vi_Tinh_ID;
+            }
+            else if (state.SelectedDonViTinhId.HasValue && !dvtById.ContainsKey(state.SelectedDonViTinhId.Value))
+            {
+                state.SelectedDonViTinhId = null;
+            }
+
+            state.ShouldRenderLoaiSanPhamCombo = string.IsNullOrWhiteSpace(loaiSanPhamInput) || !isLoaiResolvedFromFile;
+            state.ShouldRenderDonViTinhCombo = string.IsNullOrWhiteSpace(tenDvt) || !isDonViTinhResolvedFromFile;
+
+            var status = ExcelImportPreviewStatus.Valid;
+            var messageParts = new List<string>();
+
+            if (string.IsNullOrWhiteSpace(maSp)
+                || string.IsNullOrWhiteSpace(tenSp))
+            {
+                messageParts.Add("Thiếu cột bắt buộc (mã SP, tên SP).");
+            }
+
+            if (state.ShouldRenderLoaiSanPhamCombo && !state.SelectedLoaiSanPhamId.HasValue)
+            {
+                messageParts.Add("Chưa chọn loại sản phẩm.");
+            }
+
+            if (state.ShouldRenderDonViTinhCombo && !state.SelectedDonViTinhId.HasValue)
+            {
+                messageParts.Add("Chưa chọn đơn vị tính.");
+            }
+
+            string message;
+            if (messageParts.Count > 0)
+            {
+                status = ExcelImportPreviewStatus.Error;
+                message = string.Join(" ", messageParts);
+            }
+            else if (!fileCodes.Add(maSp))
+            {
+                status = ExcelImportPreviewStatus.Warning;
+                message = $"Mã sản phẩm '{maSp}' bị trùng trong file.";
+            }
+            else if (existingProductCodes.Contains(maSp))
+            {
+                status = ExcelImportPreviewStatus.Warning;
+                message = $"Mã sản phẩm '{maSp}' đã tồn tại.";
+            }
+            else
+            {
+                message = string.Empty;
+            }
+
+            var loaiDisplay = state.SelectedLoaiSanPhamId.HasValue && lspById.TryGetValue(state.SelectedLoaiSanPhamId.Value, out var loaiById)
+                ? $"{loaiById.Ten_LSP} ({loaiById.Ma_LSP})"
+                : loaiSanPhamInput;
+
+            var dvtDisplay = state.SelectedDonViTinhId.HasValue && dvtById.TryGetValue(state.SelectedDonViTinhId.Value, out var dvtBySelectedId)
+                ? dvtBySelectedId.Ten_Don_Vi_Tinh
+                : tenDvt;
+
+            previewRows.Add(new ExcelImportPreviewRow(
+                DisplayIndex: index + 1,
+                SourceIndex: index,
+                ExcelRowNumber: row.RowNumber,
+                Cells: [maSp, tenSp, loaiDisplay, dvtDisplay, ghiChu],
+                Status: status,
+                Message: message));
+        }
+
+        return previewRows;
+    }
+
+    private SanPhamImportResolutionState? GetImportResolutionState(int sourceIndex)
+    {
+        importResolutionBySourceIndex.TryGetValue(sourceIndex, out var state);
+        return state;
+    }
+
+    private static string GetDisplayCellText(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "Trống" : value;
+    }
+
+    private void HandleLoaiSanPhamSelectionChanged(int sourceIndex, ChangeEventArgs args)
+    {
+        if (!importResolutionBySourceIndex.TryGetValue(sourceIndex, out var state))
+        {
+            return;
+        }
+
+        var value = args.Value?.ToString();
+        state.SelectedLoaiSanPhamId = int.TryParse(value, out var parsed) && parsed > 0 ? parsed : null;
+        RebuildSanPhamImportPreviewRows();
+    }
+
+    private void HandleDonViTinhSelectionChanged(int sourceIndex, ChangeEventArgs args)
+    {
+        if (!importResolutionBySourceIndex.TryGetValue(sourceIndex, out var state))
+        {
+            return;
+        }
+
+        var value = args.Value?.ToString();
+        state.SelectedDonViTinhId = int.TryParse(value, out var parsed) && parsed > 0 ? parsed : null;
+        RebuildSanPhamImportPreviewRows();
+    }
+
+    private async Task AddMissingLoaiSanPhamAsync(int sourceIndex)
+    {
+        if (!importResolutionBySourceIndex.TryGetValue(sourceIndex, out var state))
+        {
+            return;
+        }
+
+        var rawValue = state.RawLoaiSanPham?.Trim();
+        if (string.IsNullOrWhiteSpace(rawValue))
+        {
+            return;
+        }
+
+        state.IsAddingLoaiSanPham = true;
+        try
+        {
+            var existedByName = loaiSanPhamOptions.FirstOrDefault(x => string.Equals(x.Ten_LSP, rawValue, StringComparison.OrdinalIgnoreCase));
+            if (existedByName is not null)
+            {
+                state.SelectedLoaiSanPhamId = existedByName.Loai_San_Pham_ID;
+                RebuildSanPhamImportPreviewRows();
+                return;
+            }
+
+            var generatedCode = GenerateLoaiSanPhamCode(rawValue, loaiSanPhamOptions.Select(x => x.Ma_LSP));
+            var createResult = await LoaiSanPhamService.CreateAsync(new LoaiSanPhamUpsertVm
+            {
+                Ma_LSP = generatedCode,
+                Ten_LSP = rawValue
+            });
+
+            await ReloadLoaiSanPhamOptionsAsync();
+
+            var matched = loaiSanPhamOptions.FirstOrDefault(x =>
+                string.Equals(x.Ten_LSP, rawValue, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(x.Ma_LSP, generatedCode, StringComparison.OrdinalIgnoreCase));
+
+            if (matched is not null)
+            {
+                state.SelectedLoaiSanPhamId = matched.Loai_San_Pham_ID;
+                pageMessage = createResult.Success
+                    ? $"Đã thêm mới loại sản phẩm '{matched.Ten_LSP}'."
+                    : $"Đã dùng loại sản phẩm sẵn có '{matched.Ten_LSP}'.";
+                pageMessageIsError = false;
+            }
+            else if (!createResult.Success)
+            {
+                pageMessage = $"Không thể thêm mới loại sản phẩm '{rawValue}': {createResult.Message}";
+                pageMessageIsError = true;
+            }
+
+            RebuildSanPhamImportPreviewRows();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Add missing LoaiSanPham from SanPham import preview failed. SourceIndex={SourceIndex}", sourceIndex);
+            pageMessage = "Không thể thêm mới loại sản phẩm từ dữ liệu xem trước.";
+            pageMessageIsError = true;
+        }
+        finally
+        {
+            state.IsAddingLoaiSanPham = false;
+        }
+    }
+
+    private async Task AddMissingDonViTinhAsync(int sourceIndex)
+    {
+        if (!importResolutionBySourceIndex.TryGetValue(sourceIndex, out var state))
+        {
+            return;
+        }
+
+        var rawValue = state.RawDonViTinh?.Trim();
+        if (string.IsNullOrWhiteSpace(rawValue))
+        {
+            return;
+        }
+
+        state.IsAddingDonViTinh = true;
+        try
+        {
+            var existed = donViTinhOptions.FirstOrDefault(x => string.Equals(x.Ten_Don_Vi_Tinh, rawValue, StringComparison.OrdinalIgnoreCase));
+            if (existed is not null)
+            {
+                state.SelectedDonViTinhId = existed.Don_Vi_Tinh_ID;
+                RebuildSanPhamImportPreviewRows();
+                return;
+            }
+
+            var createResult = await DonViTinhService.CreateAsync(new DonViTinhUpsertVm
+            {
+                Ten_Don_Vi_Tinh = rawValue
+            });
+
+            await ReloadDonViTinhOptionsAsync();
+
+            var matched = donViTinhOptions.FirstOrDefault(x =>
+                string.Equals(x.Ten_Don_Vi_Tinh, rawValue, StringComparison.OrdinalIgnoreCase));
+
+            if (matched is not null)
+            {
+                state.SelectedDonViTinhId = matched.Don_Vi_Tinh_ID;
+                pageMessage = createResult.Success
+                    ? $"Đã thêm mới đơn vị tính '{matched.Ten_Don_Vi_Tinh}'."
+                    : $"Đã dùng đơn vị tính sẵn có '{matched.Ten_Don_Vi_Tinh}'.";
+                pageMessageIsError = false;
+            }
+            else if (!createResult.Success)
+            {
+                pageMessage = $"Không thể thêm mới đơn vị tính '{rawValue}': {createResult.Message}";
+                pageMessageIsError = true;
+            }
+
+            RebuildSanPhamImportPreviewRows();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Add missing DonViTinh from SanPham import preview failed. SourceIndex={SourceIndex}", sourceIndex);
+            pageMessage = "Không thể thêm mới đơn vị tính từ dữ liệu xem trước.";
+            pageMessageIsError = true;
+        }
+        finally
+        {
+            state.IsAddingDonViTinh = false;
+        }
+    }
+
+    private async Task ReloadLoaiSanPhamOptionsAsync()
+    {
+        var latestOptions = await LoaiSanPhamService.GetAllAsync();
+        loaiSanPhamOptions.Clear();
+        loaiSanPhamOptions.AddRange(latestOptions);
+    }
+
+    private async Task ReloadDonViTinhOptionsAsync()
+    {
+        var latestOptions = await DonViTinhService.GetAllAsync();
+        donViTinhOptions.Clear();
+        donViTinhOptions.AddRange(latestOptions);
+    }
+
+    private static string GenerateLoaiSanPhamCode(string sourceName, IEnumerable<string?> existingCodes)
+    {
+        var normalized = sourceName.Normalize(NormalizationForm.FormD);
+        var builder = new StringBuilder(normalized.Length);
+
+        foreach (var ch in normalized)
+        {
+            var category = CharUnicodeInfo.GetUnicodeCategory(ch);
+            if (category == UnicodeCategory.NonSpacingMark)
+            {
+                continue;
+            }
+
+            var upper = char.ToUpperInvariant(ch == 'đ' ? 'd' : ch);
+            if (char.IsLetterOrDigit(upper))
+            {
+                builder.Append(upper);
+            }
+            else if (char.IsWhiteSpace(ch) && (builder.Length == 0 || builder[^1] != '-'))
+            {
+                builder.Append('-');
+            }
+        }
+
+        var core = builder
+            .ToString()
+            .Trim('-');
+        if (string.IsNullOrWhiteSpace(core))
+        {
+            core = "SANPHAM";
+        }
+
+        var candidate = $"LSP-{core}";
+        if (candidate.Length > 50)
+        {
+            candidate = candidate[..50];
+        }
+
+        var existingSet = existingCodes
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x!.Trim().ToUpperInvariant())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        if (!existingSet.Contains(candidate))
+        {
+            return candidate;
+        }
+
+        for (var index = 2; index <= 9999; index++)
+        {
+            var suffix = $"-{index}";
+            var maxCoreLength = Math.Max(1, 50 - "LSP-".Length - suffix.Length);
+            var shortenedCore = core.Length > maxCoreLength ? core[..maxCoreLength] : core;
+            var next = $"LSP-{shortenedCore}{suffix}";
+            if (!existingSet.Contains(next))
+            {
+                return next;
+            }
+        }
+
+        return $"LSP-{Guid.NewGuid():N}"[..50];
+    }
+
+    private static bool TryResolveLoaiSanPham(
+        string input,
+        IReadOnlyDictionary<string, LoaiSanPhamListItemVm> byCode,
+        IReadOnlyDictionary<string, LoaiSanPhamListItemVm> byName,
+        out LoaiSanPhamListItemVm loaiSanPham)
+    {
+        if (byCode.TryGetValue(input, out var byCodeMatch) && byCodeMatch is not null)
+        {
+            loaiSanPham = byCodeMatch;
+            return true;
+        }
+
+        if (byName.TryGetValue(input, out var byNameMatch) && byNameMatch is not null)
+        {
+            loaiSanPham = byNameMatch;
+            return true;
+        }
+
+        loaiSanPham = null!;
+        return false;
+    }
+
+    private sealed class SanPhamImportResolutionState
+    {
+        public string RawLoaiSanPham { get; set; } = string.Empty;
+        public string RawDonViTinh { get; set; } = string.Empty;
+        public int? SelectedLoaiSanPhamId { get; set; }
+        public int? SelectedDonViTinhId { get; set; }
+        public bool ShouldRenderLoaiSanPhamCombo { get; set; }
+        public bool ShouldRenderDonViTinhCombo { get; set; }
+        public bool IsAddingLoaiSanPham { get; set; }
+        public bool IsAddingDonViTinh { get; set; }
+    }
+
     private void ClearPageMessage()
     {
         pageMessage = null;
@@ -496,6 +1224,106 @@
     {
         return !string.IsNullOrWhiteSpace(source)
                && source.Contains(keyword, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task DownloadExcelAsync(string fileName, byte[] bytes)
+    {
+        await JS.InvokeVoidAsync(
+            "blazorFileDownload.downloadFileFromBase64",
+            fileName,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            Convert.ToBase64String(bytes));
+    }
+
+    private static bool IsDuplicateImportMessage(string? message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return false;
+        }
+
+        return message.Contains("đã tồn tại", StringComparison.OrdinalIgnoreCase)
+               || message.Contains("bị trùng", StringComparison.OrdinalIgnoreCase)
+               || message.Contains("đã được", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string BuildImportSummary(
+        int successCount,
+        IReadOnlyList<string> skippedReasons)
+    {
+        if (skippedReasons.Count == 0)
+        {
+            return $"Đã nhập {successCount} dòng.";
+        }
+
+        var reasonGroups = skippedReasons
+            .Select(ExtractImportSkipReasonLabel)
+            .GroupBy(x => x, StringComparer.OrdinalIgnoreCase)
+            .Select(group => new
+            {
+                Reason = group.First(),
+                Count = group.Count()
+            })
+            .OrderByDescending(x => x.Count)
+            .ThenBy(x => x.Reason, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+
+        var breakdown = string.Join(", ", reasonGroups.Select(x => $"{x.Count} dòng {x.Reason}"));
+        return $"Đã nhập {successCount} dòng, bỏ qua {skippedReasons.Count} dòng: {breakdown}.";
+    }
+
+    private static string ExtractImportSkipReasonLabel(string detail)
+    {
+        var reason = detail ?? string.Empty;
+        var separatorIndex = reason.IndexOf(':');
+        if (separatorIndex >= 0 && separatorIndex < reason.Length - 1)
+        {
+            reason = reason[(separatorIndex + 1)..];
+        }
+
+        reason = reason.Trim().TrimEnd('.');
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            return "không rõ lý do";
+        }
+
+        if (reason.Contains("Mã sản phẩm đã tồn tại", StringComparison.OrdinalIgnoreCase))
+        {
+            return "trùng mã SP";
+        }
+
+        if (reason.Contains("đã tồn tại", StringComparison.OrdinalIgnoreCase)
+            || reason.Contains("bị trùng", StringComparison.OrdinalIgnoreCase))
+        {
+            return "trùng dữ liệu";
+        }
+
+        if (reason.Contains("Thiếu cột bắt buộc", StringComparison.OrdinalIgnoreCase))
+        {
+            return "thiếu mã SP hoặc tên SP";
+        }
+
+        if (reason.Contains("Chưa chọn loại sản phẩm", StringComparison.OrdinalIgnoreCase))
+        {
+            return "thiếu loại sản phẩm";
+        }
+
+        if (reason.Contains("Chưa chọn đơn vị tính", StringComparison.OrdinalIgnoreCase))
+        {
+            return "thiếu đơn vị tính";
+        }
+
+        if (reason.Contains("Không tìm thấy loại sản phẩm", StringComparison.OrdinalIgnoreCase))
+        {
+            return "loại sản phẩm chưa có";
+        }
+
+        if (reason.Contains("Không tìm thấy đơn vị tính", StringComparison.OrdinalIgnoreCase))
+        {
+            return "đơn vị tính chưa có";
+        }
+
+        return reason;
     }
 
     private enum FormMode

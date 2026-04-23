@@ -20,14 +20,22 @@
 }
 
 .app-shell {
+    --header-content-gap: 10px;
     box-sizing: border-box;
-    display: grid;
-    gap: 1rem;
-    grid-template-columns: minmax(260px, 300px) minmax(0, 1fr);
+    display: flex;
+    flex-direction: column;
+    gap: var(--header-content-gap);
     margin: 0 auto;
     max-width: 1460px;
     min-height: 100vh;
     padding: 1rem;
+}
+
+.app-content {
+    box-sizing: border-box;
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: minmax(260px, 300px) minmax(0, 1fr);
 }
 
 .app-sidebar {
@@ -37,7 +45,7 @@
     height: fit-content;
     padding: 1rem;
     position: sticky;
-    top: 1rem;
+    top: 5.8rem;
 }
 
 .app-sidebar h2 {
@@ -50,8 +58,12 @@
     min-width: 0;
 }
 
+.app-main > :first-child {
+    margin-top: 0 !important;
+}
+
 @media (max-width: 980px) {
-    .app-shell {
+    .app-content {
         grid-template-columns: 1fr;
     }
 

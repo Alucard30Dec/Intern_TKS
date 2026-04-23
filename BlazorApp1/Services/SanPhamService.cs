@@ -108,6 +108,8 @@ public sealed class SanPhamService : ISanPhamService
 
         var normalizedCode = NormalizeCode(model.Ma_San_Pham);
         var normalizedName = NormalizeName(model.Ten_San_Pham);
+        var normalizedGhiChu = NormalizeNullableText(model.Ghi_Chu);
+        var compareValue = normalizedCode.ToUpper();
 
         try
         {
@@ -123,10 +125,28 @@ public sealed class SanPhamService : ISanPhamService
                 return ServiceResult.Fail("Đơn vị tính không tồn tại.");
             }
 
-            var duplicatedCode = await ExistsByCodeAsync(dbContext, normalizedCode, null, cancellationToken);
-            if (duplicatedCode)
+            var activeDuplicatedCode = await dbContext.SanPhams.AnyAsync(
+                x => x.Is_Active && x.Ma_San_Pham.ToUpper() == compareValue,
+                cancellationToken);
+            if (activeDuplicatedCode)
             {
                 return ServiceResult.Fail("Mã sản phẩm đã tồn tại.");
+            }
+
+            var inactiveRecord = await dbContext.SanPhams.FirstOrDefaultAsync(
+                x => !x.Is_Active && x.Ma_San_Pham.ToUpper() == compareValue,
+                cancellationToken);
+            if (inactiveRecord is not null)
+            {
+                inactiveRecord.Is_Active = true;
+                inactiveRecord.Ma_San_Pham = normalizedCode;
+                inactiveRecord.Ten_San_Pham = normalizedName;
+                inactiveRecord.Loai_San_Pham_ID = model.Loai_San_Pham_ID;
+                inactiveRecord.Don_Vi_Tinh_ID = model.Don_Vi_Tinh_ID;
+                inactiveRecord.Ghi_Chu = normalizedGhiChu;
+
+                await dbContext.SaveChangesAsync(cancellationToken);
+                return ServiceResult.Ok("Khôi phục sản phẩm thành công.");
             }
 
             var entity = new SanPham
@@ -136,7 +156,7 @@ public sealed class SanPhamService : ISanPhamService
                 Loai_San_Pham_ID = model.Loai_San_Pham_ID,
                 Don_Vi_Tinh_ID = model.Don_Vi_Tinh_ID,
                 // Luu null thay vi chuoi rong de dong nhat voi thong ke va bao cao.
-                Ghi_Chu = NormalizeNullableText(model.Ghi_Chu),
+                Ghi_Chu = normalizedGhiChu,
                 Is_Active = true
             };
 

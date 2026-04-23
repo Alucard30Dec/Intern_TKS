@@ -424,6 +424,59 @@
     background: #f1f5f9;
 }
 
+.import-preview-editor {
+    display: grid;
+    gap: 0.35rem;
+    min-width: 220px;
+}
+
+.import-preview-editor__select {
+    background: #fff;
+    border: 1px solid #c7d4e6;
+    border-radius: 8px;
+    color: #1f2f49;
+    font-size: 0.85rem;
+    min-height: 34px;
+    padding: 0.35rem 0.48rem;
+}
+
+.import-preview-editor__select:focus {
+    border-color: #2f7ab9;
+    box-shadow: 0 0 0 2px rgba(47, 122, 185, 0.16);
+    outline: none;
+}
+
+.import-preview-editor__hint {
+    color: #5b6e86;
+    font-size: 0.78rem;
+    line-height: 1.25;
+}
+
+.import-preview-editor__button {
+    align-items: center;
+    background: #effaf6;
+    border: 1px solid #9dd8c1;
+    border-radius: 8px;
+    color: #0f766e;
+    cursor: pointer;
+    display: inline-flex;
+    font-size: 0.78rem;
+    font-weight: 700;
+    justify-content: center;
+    min-height: 30px;
+    padding: 0.3rem 0.55rem;
+    width: fit-content;
+}
+
+.import-preview-editor__button:hover:not(:disabled) {
+    background: #ddf4ec;
+}
+
+.import-preview-editor__button:disabled {
+    opacity: 0.65;
+    cursor: wait;
+}
+
 ::deep .validation-message {
     color: #b91c1c;
     display: block;

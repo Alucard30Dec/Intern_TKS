@@ -1,0 +1,389 @@
+Ban la Senior QA Automation Engineer + Senior Fullstack Engineer.
+
+Muc tieu:
+Tao bo auto test chay THAT tren UI cua du an hien tai, chay truc tiep local project, uu tien Playwright Test + TypeScript. Khong viet pseudo-code, khong viet test minh hoa. Chi tao code chay duoc.
+
+Nguyen tac chung:
+- Uu tien tinh on dinh va kha nang chay lap lai (deterministic).
+- Khong dung sleep/waitForTimeout neu co cach cho trang thai ro rang hon.
+- Test doc lap, co setup/teardown ro rang, khong phu thuoc thu tu chay.
+- Khi selector khong on dinh, them data-testid vao source code.
+- Neu phat hien bug, ghi ro buoc tai hien + muc do anh huong.
+
+1) Bat buoc phan tich source code truoc khi code test
+Phan tich va liet ke:
+- frontend framework, backend framework, ORM, DB
+- cach chay app local (dev/prod), base URL local
+- cach dang nhap/phan quyen (neu co)
+- route man hinh chinh
+- API chinh cua cac nghiep vu nhap/xuat kho
+- mo hinh du lieu chinh (don vi tinh, loai SP, SP, NCC, kho, kho-user, phieu nhap/xuat, chi tiet, bao cao)
+- selector hien co, vi tri can them data-testid
+- rang buoc business rule quan trong doc tu source (required, unique, soft-delete, tinh ton kho, rounding tien te)
+
+2) Thiet lap Playwright
+Neu chua co:
+- cai @playwright/test + browsers
+- TypeScript day du
+- playwright.config.ts hoan chinh:
+  - testDir, timeout, expect timeout
+  - retries (CI/local)
+  - reporter (list + html + junit neu can)
+  - trace, screenshot, video
+  - baseURL lay tu ENV
+  - testIdAttribute = data-testid
+  - webServer tu khoi chay app bang lenh dung cua project
+- tao npm scripts:
+  - test:e2e
+  - test:e2e:ui
+  - test:e2e:headed
+  - test:e2e:debug
+  - test:e2e:report
+Neu da co:
+- giu cau truc cu neu hop ly
+- chi nang cap phan thieu, khong pha code/test hien huu
+
+3) Cau truc test bat buoc
+- tests/e2e/
+- tests/fixtures/
+- tests/helpers/
+- tests/test-data/
+- tests/api/ (neu can phoi hop kiem chung API)
+- playwright.config.ts
+- README_AUTOTEST.md
+
+4) Quy tac viet test
+- Dung @playwright/test (test runner chuan)
+- Uu tien selector: getByRole/getByLabel/getByPlaceholder/getByTestId
+- Co assertion ro o UI; nghiep vu quan trong phai kiem them response/API hoac DB-state gian tiep qua UI
+- Dung fixture cho auth, seed data, cleanup
+- Moi test co du lieu rieng, khong dung nhau
+- Tranh flaky: cho theo network/UI state, khong dung hard sleep
+- Cho can thiet dung expect.poll hoac cho response co dieu kien
+
+5) Luong nghiep vu bat buoc
+A. Danh muc don vi tinh
+- them moi thanh cong
+- ten bat buoc
+- ten unique
+- sua thanh cong
+- xoa thanh cong hoac bao rang buoc dung
+- soft-delete rollback: tao moi trung ban ghi da xoa => khoi phuc ban ghi cu (Is_Active=true), khong tao dong moi
+
+B. Danh muc loai san pham
+- them moi thanh cong
+- ma bat buoc + unique
+- ten bat buoc + unique
+- sua/xoa theo rule
+- soft-delete rollback (ma/ten trung ban ghi da xoa)
+
+C. Danh muc san pham
+- them moi thanh cong
+- ma bat buoc + unique
+- ten bat buoc
+- loai SP bat buoc
+- don vi tinh bat buoc
+- soft-delete rollback theo ma san pham
+- kiem tra map dung loai SP/don vi tinh sau khi khoi phuc
+
+D. Danh muc nha cung cap
+- ma NCC bat buoc + unique
+- ten NCC bat buoc + unique
+- soft-delete rollback
+
+E. Danh muc kho
+- ma/ten kho theo rule hien co cua source
+- unique theo rule hien co
+- soft-delete rollback
+- kiem tra khong xoa duoc khi dang bi rang buoc boi nghiep vu khac (neu source co)
+
+F. Phan quyen kho-user
+- gan quyen thanh cong
+- khong cho luu cap Ma_Dang_Nhap + Kho_ID trung
+- soft-delete rollback cap quyen da xoa
+- user chi thay kho duoc phan quyen
+- user khong thao tac duoc kho khong co quyen
+- doi quyen, thu hoi quyen, hieu luc ngay sau reload/session moi
+
+G. Quan ly phieu nhap
+- tao phieu nhap thanh cong
+- so phieu bat buoc + unique
+- NCC bat buoc, kho bat buoc, ngay bat buoc
+- xoa phieu nhap thanh cong (soft delete)
+- in phieu nhap dung du lieu
+- soft-delete rollback theo so phieu: tao lai so phieu da xoa => khoi phuc phieu cu
+- khong tao duoc khi chi tiet rong
+- validate so luong/don gia > 0, scale tien te dung rule source (VND/USD neu co)
+
+H. Hieu chinh thong tin phieu nhap
+- sua header thanh cong
+- giu cac rang buoc required + unique
+- doi ngay/kho/NCC theo rule
+- khong pha tinh hop le ton kho lich su (neu source kiem tra)
+
+I. Hieu chinh chi tiet phieu nhap
+- them dong chi tiet thanh cong
+- bat buoc ma SP, so luong, don gia
+- sua chi so luong + don gia
+- khong cho sua ma SP khi edit
+- tri gia hien thi dung
+- add lai san pham da xoa mem trong cung phieu => khoi phuc dong cu
+
+J. Quan ly phieu xuat
+- tao phieu xuat thanh cong
+- so phieu bat buoc + unique
+- kho bat buoc, ngay bat buoc
+- xoa phieu xuat thanh cong (soft delete)
+- in phieu xuat dung du lieu
+- soft-delete rollback theo so phieu
+- khong cho xuat vuot ton (am kho) theo rule source
+
+K. Hieu chinh thong tin phieu xuat
+- sua header thanh cong
+- kiem tra required + unique
+- kiem tra rang buoc ton kho khi doi ngay/kho
+
+L. Hieu chinh chi tiet phieu xuat
+- them dong thanh cong
+- bat buoc ma SP, so luong, don gia
+- sua chi so luong + don gia
+- khong cho sua ma SP khi edit
+- tri gia dung
+- add lai san pham da xoa mem trong chi tiet => khoi phuc dong cu
+- chan ton kho am
+
+M. Bao cao chi tiet hang nhap
+- loc tu ngay/den ngay
+- du lieu khop chung tu da tao
+- bien ngay: from=to, from>to, khong nhap ngay
+
+N. Bao cao chi tiet hang xuat
+- loc tu ngay/den ngay
+- du lieu khop chung tu da tao
+- kiem tra tong hop so luong/tri gia (neu UI co)
+
+O. Bao cao xuat nhap ton
+- xac nhan cong thuc: ton cuoi = ton dau + nhap - xuat
+- kiem tra theo san pham + khoang ngay
+- kiem tra theo nhieu kho (neu co filter kho)
+- so khop voi du lieu phat sinh do test seed
+
+6) Luong nang cao bat buoc them
+- Double-submit: click Luu 2 lan lien tiep khong tao du lieu trung
+- Refresh/resume: reload trang sau thao tac, du lieu van nhat quan
+- Concurrency: 2 context/browser cung sua 1 ban ghi => hanh vi dung theo source (last write/conflict message)
+- Search/sort/pagination: ket qua dung sau CRUD
+- Injection/XSS co ban o truong ghi chu/ten (khong thuc thi script tren UI)
+- Error handling: API fail/timeout thi UI hien thong bao phu hop, khong treo
+- Network assertions cho luong critical (tao/sua/xoa phieu, chi tiet)
+
+7) Data strategy
+- Co helper seed du lieu rieng cho tung domain
+- Du lieu test co prefix unique theo timestamp/random
+- Co cleanup (uu tien qua API/service/UI theo kha nang du an)
+- Khong lam ban du lieu dung chung; neu khong tranh duoc phai ghi ro
+
+8) Cach lam viec
+- Buoc 1: scan du an + tom tat ke hoach ngan
+- Buoc 2: tao/cap nhat code test + data-testid can thiet
+- Buoc 3: chay test that local
+- Buoc 4: fix flaky selector/timing va chay lai
+- Buoc 5: xuat bao cao cuoi
+
+9) Dau ra bat buoc
+a) Danh sach file tao/sua
+b) Lenh chay test
+c) Ket qua chay (pass/fail, so luong test, link/report path)
+d) Danh sach bug phat hien tu app (steps, expected, actual, severity)
+e) Coverage map: luong nao da test, luong nao chua + ly do
+f) De xuat nang cap coverage tiep theo (API contract, visual regression, performance smoke, CI pipeline)
+
+10) Tieu chuan chat luong
+- Code sach, helper/fixture tach hop ly
+- Test doc duoc, it lap code
+- Khong hard-code sleep
+- Co beforeEach/fixture ro rang
+- Co report HTML + trace de debug
+- Uu tien test on dinh va phan anh business that
+
+11) Bo sung luong nghiep vu nang cao (bat buoc)
+
+P. Dieu huong + phan quyen route
+- User khong co quyen truy cap route bang nhap URL truc tiep
+- Menu chi hien thi chuc nang dung quyen
+- Sau logout/login lai, quyen van ap dung dung
+- User bi thu hoi quyen trong luc dang mo trang thi thao tac tiep theo bi chan dung
+
+Q. Chuoi phu thuoc danh muc
+- Khong cho xoa Don vi tinh neu dang duoc San pham active su dung
+- Khong cho xoa Loai san pham neu dang co San pham active
+- Khong cho xoa NCC neu dang co Phieu nhap active
+- Khong cho xoa Kho neu dang co Phieu nhap/Phieu xuat/Phan quyen active
+- Soft-delete rollback o bang cha khong lam sai lien ket FK hien co
+
+R. Tinh toan ven phieu va chi tiet
+- Xoa phieu thi toan bo chi tiet chuyen inactive dung
+- Khoi phuc phieu theo so phieu khong tao duplicate chi tiet active
+- Them lai san pham da xoa mem trong chi tiet thi khoi phuc dung dong cu
+- Khong cho ton tai 2 dong active cung san pham trong 1 phieu
+- Tong tri gia header khop tong tri gia chi tiet
+
+S. Bien du lieu va chuan hoa input
+- Trim khoang trang dau/cuoi; nhieu khoang trang giua chuoi duoc normalize dung
+- So sanh unique khong phan biet hoa/thuong theo rule source
+- Ky tu dac biet hop le/khong hop le theo rule ma
+- Do dai min/max tung field
+- Gia tri so luong/don gia = 0, am, qua lon, vuot precision
+- Copy/paste du lieu nhieu dong khong lam hong form
+
+T. Ton kho va nghiep vu thoi diem
+- Chan xuat am kho khi tao phieu xuat
+- Chan xuat am kho khi sua header (doi ngay/doi kho)
+- Chan xuat am kho khi sua chi tiet (tang SL xuat)
+- Xoa/sua phieu nhap lich su khong duoc lam am ton cac giao dich sau
+- Du lieu bao cao XNT phan anh dung sau moi thao tac tao/sua/xoa
+
+U. Dong thoi (concurrency)
+- Hai user cung sua 1 chung tu: ket qua theo hanh vi thuc te cua source (conflict hoac last-write)
+- Hai user cung tao cung so phieu: chi 1 ban ghi thanh cong
+- Hai user cung them cung san pham vao chi tiet: khong tao duplicate active
+- Thao tac nhanh lien tiep (double click Luu/Xoa) khong tao du lieu loi
+
+V. Kha nang phuc hoi va idempotency
+- Submit that bai do network roi retry khong tao ban ghi trung
+- Refresh giua chung thao tac khong lam sai trang thai du lieu
+- Back/forward browser khong gui lai hanh dong pha du lieu
+- Reload sau khi luu van hien thi du lieu da persist dung
+
+W. Bao cao doi soat cheo
+- Bao cao chi tiet nhap khop 100% voi du lieu phieu nhap trong khoang ngay
+- Bao cao chi tiet xuat khop 100% voi du lieu phieu xuat trong khoang ngay
+- Bao cao XNT khop cong thuc theo tung san pham va tung kho
+- Doi soat report truoc va sau khi soft-delete/rollback chung tu
+- Truong hop khong co du lieu hien thi empty state dung
+
+X. In an va hien thi chung tu
+- Man in phieu nhap hien thi dung header + detail + tong
+- Man in phieu xuat hien thi dung header + detail + tong
+- Du lieu in khop du lieu dang active (khong lay dong inactive)
+- Dinh dang ngay/tien/so luong dung rule he thong
+
+Y. Bao mat UI co ban
+- Input chua script tag khong bi thuc thi (XSS co ban)
+- URL query bat thuong khong lam crash trang
+- Khong lo thong tin nhay cam trong toast/error UI
+- Message loi than thien, khong expose stack trace
+
+Z. On dinh test va kha nang quan sat
+- Moi test ghi log buoc chinh + dinh kem trace khi fail
+- Test that bai phai co screenshot/video/trace
+- Tag test theo domain: @catalog @nhapkho @xuatkho @report @auth @rbac
+- Co smoke suite chay nhanh va full regression suite chay day du
+
+12) Bo sung yeu cau dau ra
+- Them ma tran Coverage theo bang nghiep vu x muc do: happy path, validation, permission, concurrency, rollback
+- Them danh sach "Risk chua cover" va ly do
+- Them de xuat test uu tien cao cho vong tiep theo (Top 10)
+
+13) Bo sung luong nghiep vu cap van hanh (bat buoc them)
+
+AA. Session va dang nhap
+- Session timeout: dang thao tac dang do thi het session => UI chuyen huong dang nhap, khong mat du lieu da luu
+- Dang nhap sai lien tiep nhieu lan => thong bao dung, khong crash UI
+- Dang nhap thanh cong o tab A, logout o tab B => tab A bi thu hoi session o request tiep theo
+- Refresh token/session (neu co) hoat dong dung, khong tao loop redirect
+
+AB. Da tab/da cua so
+- Cung mo 1 phieu tren 2 tab: tab B cap nhat xong, tab A luu tiep => xu ly conflict dung theo source
+- Tab A xoa ban ghi, tab B van dang sua ban ghi do => xu ly message dung, khong loi 500
+- Filter/sort tren tab A khong lam hong state tren tab B
+
+AC. Khoi luong du lieu lon
+- Danh sach co > 500 ban ghi van thao tac CRUD dung
+- Tim kiem tren du lieu lon tra ket qua dung va on dinh
+- Pagination/chuyen trang/lui trang khong mat bo loc
+- Tao nhanh nhieu phieu lien tiep (batch scenario) khong tao duplicate bat thuong
+
+AD. Kiem thu bien thoi gian
+- Nhap ngay bien min/max theo rule he thong
+- Ngay nam nhuan (29/02) va cuoi thang (30/31) tinh dung
+- Khoang ngay report cat qua thang/nam van dung so lieu
+- Doi timezone he thong client (neu co anh huong) khong lam sai ngay chung tu
+
+AE. Kiem thu dinh dang tien va so
+- Don gia VND khong cho phep thap phan (neu rule source quy dinh)
+- Don gia USD toi da 2 chu so thap phan (neu rule source quy dinh)
+- Gia tri cuc dai/sat nguong toi da khong tran so va thong bao dung
+- Tong tri gia lam tron dung theo quy tac source
+
+AF. Kiem thu tim kiem va loc nang cao
+- Tim kiem khong dau/co dau (neu source ho tro) cho ket qua dung
+- Tim kiem partial va exact match
+- Ket hop nhieu bo loc cung luc (kho + ngay + ma SP)
+- Xoa bo loc thi danh sach quay lai day du
+
+AG. Kiem thu thong bao loi va UX loi
+- Loi validation hien dung vi tri field va noi dung ro
+- Loi backend (4xx/5xx) hien thong bao than thien va co ma tham chieu neu co
+- Khi loi xay ra, nut Luu khong bi khoa vinh vien
+- Sau loi, nguoi dung sua du lieu va submit lai thanh cong
+
+AH. Kiem thu tinh toan bao cao sau bien dong
+- Bao cao cap nhat dung ngay sau tao/sua/xoa/rollback phieu
+- Doi soat ngau nhien 10 san pham giua report va du lieu giao dich
+- Bao cao theo kho phan quyen chi hien thi du lieu kho duoc phep
+- Tong cong trong report khop tong tung dong
+
+AI. Kiem thu quy trinh xoa mem va khoi phuc day du
+- Xoa mem xong, ban ghi bien mat tren UI list nhung van duoc khoi phuc dung
+- Tao moi trung du lieu da xoa => khoi phuc, khong tao row moi
+- Khoi phuc xong, toan bo lien ket nghiep vu van hop le
+- Ban ghi da xoa mem khong xuat hien trong dropdown active
+
+AJ. Kiem thu dependency dropdown
+- Dropdown LoaiSP/DonViTinh/NCC/Kho chi hien thi ban ghi active
+- Ban ghi vua tao moi hien thi ngay trong dropdown lien quan
+- Ban ghi vua xoa mem bien mat khoi dropdown ma khong can restart app
+- Chon gia tri dropdown va luu, reload lai van giu dung gia tri da luu
+
+AK. Kiem thu in va xuat du lieu
+- In khi khong co du lieu chi tiet => thong bao/phong ve dung theo source
+- In sau khi hieu chinh chung tu hien thi du lieu moi nhat
+- In tu nhiieu trinh duyet (neu can) khong vo layout nghiem trong
+- Neu co export file (pdf/excel), ten file/noi dung dung ky vong
+
+AL. Kiem thu accessibility co ban (a11y smoke)
+- Co the thao tac form chinh bang ban phim (Tab/Enter/Escape) o cac man quan trong
+- Label-input lien ket dung cho field bat buoc
+- Focus state ro rang khi co loi validation
+- Vung thong bao loi co the doc duoc boi screen reader co ban (neu source ho tro)
+
+AM. Kiem thu tuong thich man hinh
+- Desktop: 1366x768, 1920x1080
+- Mobile/tablet viewport co ban (neu app ho tro responsive)
+- Bang du lieu va form khong vo bo cuc nghiem trong
+- Nut hanh dong quan trong khong bi che/mat khi doi viewport
+
+AN. Kiem thu khoi dong va suc khoe he thong UI
+- Sau khi app startup, route chinh mo duoc khong loi JS console nghiem trong
+- Chuyen nhanh qua lai cac route chinh khong memory leak ro rang (smoke)
+- Khong co request loop bat thuong khi vao trang list/form
+- Trang thai loading/empty/error hien dung va chuyen trang thai dung
+
+AO. Kiem thu bao mat bo sung
+- SQL-like payload tren input text khong lam sai hanh vi UI
+- HTML special chars duoc encode dung khi hien thi lai
+- Khong expose thong tin ket noi DB/API key trong UI/log trinh duyet
+- Endpoint nhay cam khong goi duoc neu khong co quyen (kiem qua network response)
+
+AP. Kiem thu chat luong regression
+- Tao smoke pack <= 10 phut cho moi lan commit
+- Tao full regression pack chay ban dem
+- Co co che retry hop ly cho flaky test va danh dau test flaky de xu ly
+- Moi bug fix phai co it nhat 1 test regression di kem
+
+14) Dieu kien chap nhan cuoi cung
+- Bo test phai bao phu ca happy path + validation + permission + rollback + concurrency + report doi soat
+- Ket qua chay phai xuat duoc HTML report + trace artifact
+- Khong de test phu thuoc thu tu thuc thi
+- Neu con rui ro chua cover, bat buoc liet ke ro trong muc Residual Risks

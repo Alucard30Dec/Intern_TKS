@@ -90,3 +90,11 @@ h1:focus {
 .nav-menu__link.active .nav-menu__order {
     color: #0f766e;
 }
+
+.page-header__actions {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.62rem;
+    justify-content: flex-end;
+}

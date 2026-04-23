@@ -8,6 +8,7 @@ namespace BlazorApp1.Models.BaoCao;
 /// </summary>
 public sealed class BaoCaoDieuKienVm : IValidatableObject
 {
+    public int? Kho_ID { get; set; }
     public BaoCaoKieuLoc Kieu_Loc { get; set; } = BaoCaoKieuLoc.KhoangNgay;
     public DateTime Tu_Ngay { get; set; } = DateTime.Today.AddDays(-30);
     public DateTime Den_Ngay { get; set; } = DateTime.Today;
@@ -22,6 +23,13 @@ public sealed class BaoCaoDieuKienVm : IValidatableObject
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
+        if (Kho_ID.HasValue && Kho_ID.Value <= 0)
+        {
+            yield return new ValidationResult(
+                "Kho không hợp lệ.",
+                [nameof(Kho_ID)]);
+        }
+
         if (Nam < BusinessValidationRules.MinReportYear || Nam > BusinessValidationRules.MaxReportYear)
         {
             yield return new ValidationResult(

@@ -27,13 +27,20 @@ public sealed class NhapKhoService : INhapKhoService
     /// <summary>
     /// Lay danh sach phieu nhap kho cho man hinh quan ly.
     /// </summary>
-    public async Task<IReadOnlyList<NhapKhoListItemVm>> GetAllAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<NhapKhoListItemVm>> GetAllAsync(int? khoId = null, CancellationToken cancellationToken = default)
     {
         await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        return await dbContext.NhapKhos
+        var query = dbContext.NhapKhos
             .AsNoTracking()
-            .Where(x => x.Is_Active)
+            .Where(x => x.Is_Active);
+
+        if (khoId.HasValue)
+        {
+            query = query.Where(x => x.Kho_ID == khoId.Value);
+        }
+
+        return await query
             .OrderByDescending(x => x.Ngay_Nhap_Kho)
             .ThenByDescending(x => x.Nhap_Kho_ID)
             .Select(x => new NhapKhoListItemVm
@@ -189,10 +196,10 @@ public sealed class NhapKhoService : INhapKhoService
         {
             await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-            var duplicatedSoPhieu = await dbContext.NhapKhos.AnyAsync(
-                x => x.So_Phieu_Nhap_Kho.ToUpper() == normalizedSoPhieu.ToUpper(),
+            var activeDuplicatedSoPhieu = await dbContext.NhapKhos.AnyAsync(
+                x => x.Is_Active && x.So_Phieu_Nhap_Kho.ToUpper() == normalizedSoPhieu.ToUpper(),
                 cancellationToken);
-            if (duplicatedSoPhieu)
+            if (activeDuplicatedSoPhieu)
             {
                 return ServiceResult.Fail("Số phiếu nhập đã tồn tại.");
             }
@@ -218,6 +225,40 @@ public sealed class NhapKhoService : INhapKhoService
             if (availableProductCount != productIds.Count)
             {
                 return ServiceResult.Fail("Một hoặc nhiều sản phẩm không tồn tại hoặc đã ngưng sử dụng.");
+            }
+
+            var inactiveVoucher = await dbContext.NhapKhos
+                .Include(x => x.Nhap_Kho_Raw_Datas)
+                .FirstOrDefaultAsync(
+                    x => !x.Is_Active && x.So_Phieu_Nhap_Kho.ToUpper() == normalizedSoPhieu.ToUpper(),
+                    cancellationToken);
+
+            if (inactiveVoucher is not null)
+            {
+                inactiveVoucher.So_Phieu_Nhap_Kho = normalizedSoPhieu;
+                inactiveVoucher.Kho_ID = model.Kho_ID;
+                inactiveVoucher.NCC_ID = model.NCC_ID;
+                inactiveVoucher.Ngay_Nhap_Kho = model.Ngay_Nhap_Kho.Date;
+                inactiveVoucher.Don_Vi_Tien = normalizedDonViTien;
+                inactiveVoucher.Ghi_Chu = normalizedGhiChu;
+                inactiveVoucher.Is_Active = true;
+
+                foreach (var line in inactiveVoucher.Nhap_Kho_Raw_Datas)
+                {
+                    line.Is_Active = false;
+                }
+
+                dbContext.NhapKhoRawDatas.AddRange(normalizedDetails.Select(x => new NhapKhoRawData
+                {
+                    Nhap_Kho_ID = inactiveVoucher.Nhap_Kho_ID,
+                    San_Pham_ID = x.San_Pham_ID,
+                    SL_Nhap = x.SL_Nhap,
+                    Don_Gia_Nhap = x.Don_Gia_Nhap,
+                    Is_Active = true
+                }));
+
+                await dbContext.SaveChangesAsync(cancellationToken);
+                return ServiceResult.Ok("Khôi phục phiếu nhập kho thành công.");
             }
 
             var entity = new NhapKho
@@ -477,6 +518,21 @@ public sealed class NhapKhoService : INhapKhoService
             if (duplicatedProduct)
             {
                 return ServiceResult.Fail("Sản phẩm đã tồn tại trong phiếu nhập. Vui lòng sửa dòng hiện có.");
+            }
+
+            var inactiveLine = await dbContext.NhapKhoRawDatas.FirstOrDefaultAsync(
+                x => x.Nhap_Kho_ID == nhapKhoId
+                    && x.San_Pham_ID == model.San_Pham_ID
+                    && !x.Is_Active,
+                cancellationToken);
+            if (inactiveLine is not null)
+            {
+                inactiveLine.SL_Nhap = NormalizeQuantity(model.SL_Nhap);
+                inactiveLine.Don_Gia_Nhap = DonViTienOptions.RoundAmount(model.Don_Gia_Nhap, header.Don_Vi_Tien);
+                inactiveLine.Is_Active = true;
+
+                await dbContext.SaveChangesAsync(cancellationToken);
+                return ServiceResult.Ok("Khôi phục dòng chi tiết thành công.");
             }
 
             dbContext.NhapKhoRawDatas.Add(new NhapKhoRawData
