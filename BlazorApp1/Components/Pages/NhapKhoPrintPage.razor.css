@@ -287,7 +287,7 @@
     font-size: 1.06rem;
 }
 
-@media (max-width: 980px) {
+@media screen and (max-width: 980px) {
     .sheet-header {
         grid-template-columns: 1fr;
         gap: 0.4rem;
@@ -327,7 +327,7 @@
     }
 }
 
-@media (max-width: 640px) {
+@media screen and (max-width: 640px) {
     .print-page {
         padding: 0.55rem;
     }
@@ -359,6 +359,14 @@
         margin: 0;
         max-width: none;
         padding: 0;
+    }
+
+    .sheet-header,
+    .sheet-info,
+    .sheet-footer,
+    .sheet-signature {
+        break-inside: avoid;
+        page-break-inside: avoid;
     }
 
     .sheet-table {

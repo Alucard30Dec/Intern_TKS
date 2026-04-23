@@ -14,13 +14,16 @@ namespace BlazorApp1.Services;
 public sealed class NhapKhoService : INhapKhoService
 {
     private readonly IDbContextFactory<AppDbContext> _dbContextFactory;
+    private readonly ICurrencyExchangeRateService _currencyExchangeRateService;
     private readonly ILogger<NhapKhoService> _logger;
 
     public NhapKhoService(
         IDbContextFactory<AppDbContext> dbContextFactory,
+        ICurrencyExchangeRateService currencyExchangeRateService,
         ILogger<NhapKhoService> logger)
     {
         _dbContextFactory = dbContextFactory;
+        _currencyExchangeRateService = currencyExchangeRateService;
         _logger = logger;
     }
 
@@ -405,6 +408,7 @@ public sealed class NhapKhoService : INhapKhoService
             }
 
             var currencyChanged = !string.Equals(entity.Don_Vi_Tien, normalizedDonViTien, StringComparison.Ordinal);
+            var oldDonViTien = entity.Don_Vi_Tien;
 
             entity.So_Phieu_Nhap_Kho = normalizedSoPhieu;
             entity.Kho_ID = newKhoId;
@@ -415,9 +419,20 @@ public sealed class NhapKhoService : INhapKhoService
 
             if (currencyChanged)
             {
+                var exchangeRateResult = await _currencyExchangeRateService.GetExchangeRateAsync(
+                    oldDonViTien,
+                    normalizedDonViTien,
+                    cancellationToken);
+                if (!exchangeRateResult.Success)
+                {
+                    return ServiceResult.Fail(exchangeRateResult.Message);
+                }
+
+                var exchangeRate = exchangeRateResult.Data;
                 foreach (var detail in entity.Nhap_Kho_Raw_Datas.Where(x => x.Is_Active))
                 {
-                    detail.Don_Gia_Nhap = DonViTienOptions.RoundAmount(detail.Don_Gia_Nhap, normalizedDonViTien);
+                    var convertedPrice = detail.Don_Gia_Nhap * exchangeRate;
+                    detail.Don_Gia_Nhap = DonViTienOptions.RoundAmount(convertedPrice, normalizedDonViTien);
                 }
             }
 

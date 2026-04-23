@@ -14,13 +14,16 @@ namespace BlazorApp1.Services;
 public sealed class XuatKhoService : IXuatKhoService
 {
     private readonly IDbContextFactory<AppDbContext> _dbContextFactory;
+    private readonly ICurrencyExchangeRateService _currencyExchangeRateService;
     private readonly ILogger<XuatKhoService> _logger;
 
     public XuatKhoService(
         IDbContextFactory<AppDbContext> dbContextFactory,
+        ICurrencyExchangeRateService currencyExchangeRateService,
         ILogger<XuatKhoService> logger)
     {
         _dbContextFactory = dbContextFactory;
+        _currencyExchangeRateService = currencyExchangeRateService;
         _logger = logger;
     }
 
@@ -394,6 +397,7 @@ public sealed class XuatKhoService : IXuatKhoService
             }
 
             var currencyChanged = !string.Equals(entity.Don_Vi_Tien, normalizedDonViTien, StringComparison.Ordinal);
+            var oldDonViTien = entity.Don_Vi_Tien;
 
             entity.So_Phieu_Xuat_Kho = normalizedSoPhieu;
             entity.Kho_ID = model.Kho_ID;
@@ -403,9 +407,20 @@ public sealed class XuatKhoService : IXuatKhoService
 
             if (currencyChanged)
             {
+                var exchangeRateResult = await _currencyExchangeRateService.GetExchangeRateAsync(
+                    oldDonViTien,
+                    normalizedDonViTien,
+                    cancellationToken);
+                if (!exchangeRateResult.Success)
+                {
+                    return ServiceResult.Fail(exchangeRateResult.Message);
+                }
+
+                var exchangeRate = exchangeRateResult.Data;
                 foreach (var detail in entity.Xuat_Kho_Raw_Datas.Where(x => x.Is_Active))
                 {
-                    detail.Don_Gia_Xuat = DonViTienOptions.RoundAmount(detail.Don_Gia_Xuat, normalizedDonViTien);
+                    var convertedPrice = detail.Don_Gia_Xuat * exchangeRate;
+                    detail.Don_Gia_Xuat = DonViTienOptions.RoundAmount(convertedPrice, normalizedDonViTien);
                 }
             }
 

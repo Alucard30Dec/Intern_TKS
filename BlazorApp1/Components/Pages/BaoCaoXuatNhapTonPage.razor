@@ -3,20 +3,36 @@
 @implements IDisposable
 @using BlazorApp1.Models.BaoCao
 @using BlazorApp1.Models.Common
+@using BlazorApp1.Infrastructure.Excel
 @using BlazorApp1.Services.Interfaces
 @inject IBaoCaoService BaoCaoService
 @inject IAppSelectionContextService AppSelectionContext
+@inject IJSRuntime JS
 @inject ILogger<BaoCaoXuatNhapTonPage> Logger
 
 <PageTitle>Báo cáo xuất nhập tồn</PageTitle>
 
 <section class="report-page">
     <header class="report-page__header">
-        <h1>Báo cáo xuất nhập tồn</h1>
+        <div class="report-page__header-title">
+            <h1>Báo cáo xuất nhập tồn</h1>
+        </div>
+        <div class="report-page__actions">
+            <button type="button"
+                    class="report-export-button"
+                    @onclick="ExportExcelAsync"
+                    disabled="@(isLoading || isExporting || items.Count == 0)">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7l-5-5Z" fill="none" stroke="currentColor" stroke-width="1.8"></path>
+                    <path d="M14 2v5h5" fill="none" stroke="currentColor" stroke-width="1.8"></path>
+                    <path d="M9 10.5h6M9 13.5h6M9 16.5h4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+                </svg>
+                <span>@(isExporting ? "Đang xuất..." : "Xuất file Excel")</span>
+            </button>
+        </div>
     </header>
 
     <section class="report-card report-card--filter">
-
         <div class="period-switch">
             @foreach (var option in PeriodOptions)
             {
@@ -33,28 +49,28 @@
             @if (filter.Kieu_Loc == BaoCaoKieuLoc.KhoangNgay)
             {
                 <div class="filter-grid filter-grid--range">
-                    <label class="filter-field">
+                    <div class="filter-field">
                         <span class="filter-field__label">Từ ngày</span>
                         <div class="picker-shell picker-shell--date">
                             <InputDate class="filter-field__input filter-field__input--date"
                                        @bind-Value="filter.Tu_Ngay"
                                        @bind-Value:after="SearchAsync" />
                         </div>
-                    </label>
-                    <label class="filter-field">
+                    </div>
+                    <div class="filter-field">
                         <span class="filter-field__label">Đến ngày</span>
                         <div class="picker-shell picker-shell--date">
                             <InputDate class="filter-field__input filter-field__input--date"
                                        @bind-Value="filter.Den_Ngay"
                                        @bind-Value:after="SearchAsync" />
                         </div>
-                    </label>
+                    </div>
                 </div>
             }
             else if (filter.Kieu_Loc == BaoCaoKieuLoc.Thang)
             {
                 <div class="filter-grid filter-grid--month">
-                    <label class="filter-field">
+                    <div class="filter-field">
                         <span class="filter-field__label">Tháng</span>
                         <div class="picker-shell picker-shell--select">
                             <InputSelect class="filter-field__input filter-field__input--select"
@@ -66,8 +82,8 @@
                                 }
                             </InputSelect>
                         </div>
-                    </label>
-                    <label class="filter-field">
+                    </div>
+                    <div class="filter-field">
                         <span class="filter-field__label">Năm</span>
                         <div class="picker-shell picker-shell--select">
                             <InputSelect class="filter-field__input filter-field__input--select"
@@ -79,13 +95,13 @@
                                 }
                             </InputSelect>
                         </div>
-                    </label>
+                    </div>
                 </div>
             }
             else if (filter.Kieu_Loc == BaoCaoKieuLoc.Quy)
             {
                 <div class="filter-grid filter-grid--quarter">
-                    <label class="filter-field">
+                    <div class="filter-field">
                         <span class="filter-field__label">Quý</span>
                         <div class="picker-shell picker-shell--select">
                             <InputSelect class="filter-field__input filter-field__input--select"
@@ -97,8 +113,8 @@
                                 }
                             </InputSelect>
                         </div>
-                    </label>
-                    <label class="filter-field">
+                    </div>
+                    <div class="filter-field">
                         <span class="filter-field__label">Năm</span>
                         <div class="picker-shell picker-shell--select">
                             <InputSelect class="filter-field__input filter-field__input--select"
@@ -110,13 +126,13 @@
                                 }
                             </InputSelect>
                         </div>
-                    </label>
+                    </div>
                 </div>
             }
             else
             {
                 <div class="filter-grid filter-grid--year">
-                    <label class="filter-field">
+                    <div class="filter-field">
                         <span class="filter-field__label">Năm</span>
                         <div class="picker-shell picker-shell--select">
                             <InputSelect class="filter-field__input filter-field__input--select"
@@ -128,7 +144,7 @@
                                 }
                             </InputSelect>
                         </div>
-                    </label>
+                    </div>
                 </div>
             }
         </div>
@@ -239,6 +255,8 @@
     private readonly List<BaoCaoXuatNhapTonItemVm> items = [];
     private BaoCaoDieuKienVm filter = CreateDefaultFilter();
     private bool isLoading;
+    private bool isExporting;
+    private int searchVersion;
     private string? pageMessage;
     private bool pageMessageIsError;
 
@@ -272,17 +290,19 @@
 
     private async Task SearchAsync()
     {
+        var currentSearchVersion = ++searchVersion;
         ClearPageMessage();
         items.Clear();
 
-        if (!AppSelectionContext.SelectedKhoId.HasValue)
+        var selectedKhoId = AppSelectionContext.SelectedKhoId;
+        if (!selectedKhoId.HasValue)
         {
             pageMessage = "Tài khoản đang chọn chưa được phân quyền kho nào.";
             pageMessageIsError = true;
             return;
         }
 
-        filter.Kho_ID = AppSelectionContext.SelectedKhoId.Value;
+        filter.Kho_ID = selectedKhoId.Value;
 
         if (!TryApplyDateRangeByPeriod())
         {
@@ -294,6 +314,11 @@
         try
         {
             var result = await BaoCaoService.GetBaoCaoXuatNhapTonAsync(filter);
+            if (currentSearchVersion != searchVersion)
+            {
+                return;
+            }
+
             if (!result.Success || result.Data is null)
             {
                 pageMessage = result.Message;
@@ -311,6 +336,11 @@
         }
         catch (Exception ex)
         {
+            if (currentSearchVersion != searchVersion)
+            {
+                return;
+            }
+
             Logger.LogError(
                 ex,
                 "Load report xuat nhap ton failed. TuNgay={TuNgay}, DenNgay={DenNgay}",
@@ -321,13 +351,52 @@
         }
         finally
         {
-            isLoading = false;
+            if (currentSearchVersion == searchVersion)
+            {
+                isLoading = false;
+            }
         }
     }
 
     private void HandleSelectionChanged()
     {
-        _ = InvokeAsync(SearchAsync);
+        _ = InvokeAsync(async () =>
+        {
+            await SearchAsync();
+            StateHasChanged();
+        });
+    }
+
+    private async Task ExportExcelAsync()
+    {
+        if (items.Count == 0)
+        {
+            pageMessage = "Không có dữ liệu để xuất file Excel.";
+            pageMessageIsError = true;
+            return;
+        }
+
+        isExporting = true;
+        try
+        {
+            var bytes = BaoCaoExcelExporter.CreateBaoCaoXuatNhapTonWorkbook(items, filter.Tu_Ngay, filter.Den_Ngay);
+            var fileName = $"bao-cao-xuat-nhap-ton-{DateTime.Now:yyyyMMdd-HHmmss}.xlsx";
+            await DownloadExcelAsync(fileName, bytes);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(
+                ex,
+                "Export report xuat nhap ton failed. TuNgay={TuNgay}, DenNgay={DenNgay}",
+                filter.Tu_Ngay,
+                filter.Den_Ngay);
+            pageMessage = "Không thể xuất file Excel báo cáo xuất nhập tồn.";
+            pageMessageIsError = true;
+        }
+        finally
+        {
+            isExporting = false;
+        }
     }
 
     private bool TryApplyDateRangeByPeriod()
@@ -410,4 +479,14 @@
             .Reverse()
             .ToArray();
     }
+
+    private async Task DownloadExcelAsync(string fileName, byte[] bytes)
+    {
+        await JS.InvokeVoidAsync(
+            "blazorFileDownload.downloadFileFromBase64",
+            fileName,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            Convert.ToBase64String(bytes));
+    }
 }
+

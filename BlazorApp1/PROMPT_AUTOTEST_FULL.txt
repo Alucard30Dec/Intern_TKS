@@ -387,3 +387,65 @@ AP. Kiem thu chat luong regression
 - Ket qua chay phai xuat duoc HTML report + trace artifact
 - Khong de test phu thuoc thu tu thuc thi
 - Neu con rui ro chua cover, bat buoc liet ke ro trong muc Residual Risks
+
+15) Luong nghiep vu chuyen sau bo sung (muc uu tien cao)
+
+AQ. Chu ky du lieu va khoa so (neu he thong co)
+- Khong cho tao/sua/xoa chung tu trong ky da khoa
+- Bao cao ky da khoa khong bi thay doi sau thao tac o ky sau
+- Mo khoa ky (neu co quyen) thi nghiep vu duoc mo lai dung pham vi
+- Nhat ky thao tac khoa/mo khoa duoc ghi nhan day du
+
+AR. Toan ven so lieu nhap-xuat-ton theo dong thoi gian
+- Tao phieu nhap o ngay T2, phieu xuat o ngay T1 truoc do => he thong chan neu gay am ton
+- Sua ngay chung tu lam thay doi thu tu phat sinh => ton kho van hop le
+- Xoa chung tu qua khu khong lam sai ton tai cac ngay hien tai
+- Chay doi soat ton theo ngay (daily snapshot) khong lech
+
+AS. Kiem thu rollback nghiep vu lien hoan
+- Tao phieu + them chi tiet + sua + xoa chi tiet + sua lai header + xoa phieu => du lieu sau cung nhat quan
+- Sau rollback, tao lai cung so phieu hoat dong dung co che khoi phuc
+- Khong de lai dong chi tiet mo coi (orphan) sau cac buoc rollback
+- Danh sach UI va bao cao deu phan anh dung trang thai cuoi
+
+AT. Rang buoc cheo danh muc va chung tu
+- Doi DonViTinh/LoaiSP cua san pham dang co trong chung tu active thi hanh vi dung theo rule source
+- Soft-delete danh muc tham chieu khong lam vo lich su chung tu
+- Khoi phuc danh muc tham chieu thi dropdown/chung tu nhan dien dung lai
+- Khong cho map FK sai giua san pham-loai-don vi tinh
+
+AU. Kiem thu thong ke va tong hop giao dien
+- Counter so dong, tong tri gia, tong so phieu tren man hinh list khop du lieu thuc
+- Sau moi thao tac CRUD, so lieu tong hop cap nhat dung ngay
+- Sap xep theo tri gia/ngay/ma khong sai thu tu
+- Loc + sap xep + pagination ket hop van cho ket qua dung
+
+AV. Kiem thu xu ly loi bat dong bo
+- API tra ve cham, user thao tac tiep: UI khong gui request trung lap nguy hiem
+- Huy thao tac giua chung (dong modal/chuyen trang) khong de trang thai nua luu
+- Request that bai sau khi da toi DB (partial failure) duoc hien thi va doi soat dung
+- Nut action duoc disable/enable dung theo trang thai dang xu ly
+
+AW. Kiem thu tinh dung dan thong diep nghiep vu
+- Thong diep loi phan biet ro: trung du lieu active vs khoi phuc du lieu da xoa mem
+- Thong diep rang buoc FK chi ro doi tuong dang rang buoc
+- Thong diep validation chi ro field va dieu kien vi pham
+- Khong co thong diep mo ho gay nham lan thao tac
+
+AX. Kiem thu du lieu bien va pha hoai logic
+- Chuoi rat dai, ky tu unicode dac biet, khoang trang nhieu, emoji (neu he thong cho phep) xu ly dung
+- So luong/don gia sat nguong toi da/min duoc xu ly dung
+- Nhap nhanh lien tiep bang ban phim/scan ma khong lam vo logic form
+- Paste gia tri khong dung dinh dang vao field so/ngay duoc chan dung
+
+AY. Kiem thu nhat quan da lop (UI/API/bao cao)
+- Cung mot nghiep vu, ket qua hien thi list, chi tiet, man in, bao cao phai thong nhat
+- So lieu sau soft-delete va sau khoi phuc duoc phan anh dong bo tren moi man lien quan
+- Doi soat ngau nhien 20 giao dich giua UI va API response
+- Bat ky sai lech nao deu duoc danh dau la bug logic nghiem trong
+
+AZ. Kiem thu van hanh lien tuc
+- Chay smoke regression lap lai nhieu vong (>= 5 lan) de bat flaky logic
+- Chay full regression voi du lieu moi moi lan, khong dung lai state cu
+- Bao cao ty le fail theo nhom nghiep vu va xac dinh diem nong loi logic
+- Neu co test khong on dinh, bat buoc phan tich nguyen nhan va de xuat sua code/test

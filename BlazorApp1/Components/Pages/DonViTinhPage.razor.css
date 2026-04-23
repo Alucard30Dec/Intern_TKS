@@ -9,6 +9,11 @@
     --ui-accent: #0f4c81;
     --ui-danger: #b4233f;
     --ui-warning: #b45309;
+    --control-height: 36px;
+    --control-radius: 14px;
+    --control-font-size: 0.82rem;
+    --control-padding-y: 0.12rem;
+    --control-padding-x: 0.68rem;
     display: grid;
     gap: 1rem;
 }
@@ -296,34 +301,37 @@
     color: #dc2626;
 }
 
-.form-field__input {
+.form-shell ::deep .form-field__input {
     background: #fff;
     border: 1px solid var(--ui-border-strong);
-    border-radius: 10px;
+    border-radius: var(--control-radius);
     box-sizing: border-box;
     color: var(--ui-text);
     display: block;
     font: inherit;
-    font-size: 0.94rem;
-    min-height: 42px;
-    padding: 0.52rem 0.68rem;
+    font-size: var(--control-font-size);
+    line-height: 1.1;
+    min-height: var(--control-height);
+    padding: var(--control-padding-y) var(--control-padding-x);
     transition: border-color 0.16s ease, box-shadow 0.16s ease;
     width: 100%;
 }
 
-.form-field__input::placeholder {
+.form-shell ::deep .form-field__input::placeholder {
     color: #94a3b8;
 }
 
-    .form-field__input:focus {
-        border-color: #2f7ab9;
-        box-shadow: 0 0 0 3px rgba(47, 122, 185, 0.18);
-        outline: none;
-    }
+.form-shell ::deep .form-field__input:focus {
+    border-color: #2f7ab9;
+    box-shadow: 0 0 0 3px rgba(47, 122, 185, 0.18);
+    outline: none;
+}
 
-.form-field__input--multiline {
-    min-height: 118px;
+.form-shell ::deep .form-field__input--multiline {
+    border-radius: var(--control-radius);
+    min-height: 110px;
     line-height: 1.45;
+    padding: 0.58rem 0.68rem;
     resize: vertical;
 }
 

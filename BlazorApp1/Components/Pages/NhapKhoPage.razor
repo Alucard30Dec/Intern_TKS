@@ -12,6 +12,7 @@
 @inject INhapKhoService NhapKhoService
 @inject INhaCungCapService NhaCungCapService
 @inject ISanPhamService SanPhamService
+@inject ICurrencyExchangeRateService CurrencyExchangeRateService
 @inject IAppSelectionContextService AppSelectionContext
 @inject IJSRuntime JS
 @inject ILogger<NhapKhoPage> Logger
@@ -241,24 +242,26 @@
 
     @if (IsFormVisible)
     {
-        <div class="modal-overlay" @onclick="HandleModalBackdropClick">
-            <section class="card card--form modal-card" @onclick:stopPropagation="true">
-                <header class="card__header card__header--form">
-                    <h2>@(isEditMode ? "Sửa phiếu nhập kho" : "Tạo phiếu nhập kho")</h2>
-                    <div class="modal-header-actions">
-                        <span class="card__tag">@(isEditMode ? "Chế độ chỉnh sửa" : "Chỉ thêm mới")</span>
+        <div class="modal-overlay receipt-modal-overlay" @onclick="HandleModalBackdropClick">
+            <section class="card card--form modal-card modal-card--nhap-form receipt-modal" @onclick:stopPropagation="true">
+                <header class="card__header card__header--form nk-modal-header receipt-header">
+                    <h2 class="receipt-title">@(isEditMode ? "Sửa phiếu nhập kho" : "Tạo phiếu nhập kho")</h2>
+                    <div class="modal-header-actions nk-modal-header-actions receipt-header-right">
+                        <span class="card__tag nk-mode-tag receipt-badge">@(isEditMode ? "Chế độ chỉnh sửa" : "Chỉ thêm mới")</span>
                         <button type="button"
-                                class="app-button app-button--ghost app-button--icon"
+                                class="nk-close-button receipt-close"
                                 title="Đóng"
                                 @onclick="CancelForm"
                                 disabled="@isSaving">
-                            ×
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="m6 6 12 12M18 6 6 18" />
+                            </svg>
                         </button>
                     </div>
                 </header>
 
-                <div class="card__body">
-                    <div class="form-shell">
+                <div class="card__body nk-modal-body receipt-body receipt-modal-body">
+                    <div class="form-shell nk-form-shell">
                         <EditForm Model="formModel" OnValidSubmit="SaveAsync" FormName="NhapKhoForm">
                             <DataAnnotationsValidator />
 
@@ -269,115 +272,239 @@
                                 </div>
                             }
 
-                            <div class="form-grid">
-                                <div class="form-field form-field--code">
-                                    <div class="form-field__head">
-                                        <label class="form-field__label">Số phiếu nhập <span class="required-mark">*</span></label>
-                                        <span class="form-field__count">@((formModel.So_Phieu_Nhap_Kho?.Length ?? 0))/50</span>
-                                    </div>
-                                    <InputText class="form-field__input"
-                                               @bind-Value="formModel.So_Phieu_Nhap_Kho"
-                                               @oninput="HandleSoPhieuInput"
-                                               maxlength="50"
-                                               placeholder="Nhập số phiếu nhập kho" />
-                                    <p class="form-field__hint">Không được để trống và phải duy nhất.</p>
-                                    <ValidationMessage For="@(() => formModel.So_Phieu_Nhap_Kho)" />
-                                </div>
+                            <div class="receipt-workspace">
+                                <section class="receipt-info-panel receipt-left">
+                                    <h3 class="receipt-panel-title receipt-section-title">Thông tin phiếu nhập kho</h3>
 
-                                <div class="form-field form-field--lookup">
-                                    <div class="form-field__head">
-                                        <label class="form-field__label">Kho <span class="required-mark">*</span></label>
-                                    </div>
-                                    <InputSelect class="form-field__input" @bind-Value="formModel.Kho_ID">
-                                        <option value="0">-- Chọn kho --</option>
-                                        @foreach (var option in khoOptions)
-                                        {
-                                            <option value="@option.Kho_ID">@option.Ten_Kho</option>
-                                        }
-                                    </InputSelect>
-                                    <ValidationMessage For="@(() => formModel.Kho_ID)" />
-                                </div>
-
-                                <div class="form-field form-field--lookup">
-                                    <div class="form-field__head">
-                                        <label class="form-field__label">Nhà cung cấp <span class="required-mark">*</span></label>
-                                    </div>
-                                    <InputSelect class="form-field__input" @bind-Value="formModel.NCC_ID">
-                                        <option value="0">-- Chọn nhà cung cấp --</option>
-                                        @foreach (var option in nhaCungCapOptions)
-                                        {
-                                            <option value="@option.NCC_ID">@option.Ten_NCC (@option.Ma_NCC)</option>
-                                        }
-                                    </InputSelect>
-                                    <ValidationMessage For="@(() => formModel.NCC_ID)" />
-                                </div>
-
-                                <div class="form-field form-field--date">
-                                    <div class="form-field__head">
-                                        <label class="form-field__label">Ngày nhập kho <span class="required-mark">*</span></label>
-                                    </div>
-                                    <InputText class="form-field__input"
-                                               @bind-Value="ngayNhapKhoText"
-                                               @oninput="HandleNgayNhapKhoInput"
-                                               maxlength="10"
-                                               placeholder="dd/MM/yyyy" />
-                                    <p class="form-field__hint">Định dạng bắt buộc: dd/MM/yyyy.</p>
-                                    <ValidationMessage For="@(() => formModel.Ngay_Nhap_Kho)" />
-                                </div>
-                            </div>
-
-                            <div class="form-field form-field--note">
-                                <div class="form-field__head">
-                                    <label class="form-field__label">Ghi chú</label>
-                                    <span class="form-field__count">@((formModel.Ghi_Chu?.Length ?? 0))/255</span>
-                                </div>
-                                <InputTextArea class="form-field__input form-field__input--multiline"
-                                               @bind-Value="formModel.Ghi_Chu"
-                                               @oninput="HandleGhiChuInput"
-                                               maxlength="255"
-                                               placeholder="Nhập ghi chú" />
-                                <ValidationMessage For="@(() => formModel.Ghi_Chu)" />
-                            </div>
-
-                            <section class="line-section">
-                                <header class="line-section__header">
-                                    <h3>Chi tiết nhập kho</h3>
-                                    @if (!isEditMode)
-                                    {
-                                        <div class="line-section__tools">
-                                            <label class="currency-picker">
-                                                <span class="currency-picker__label">Đơn vị tiền</span>
-                                                <select class="currency-picker__input"
-                                                        value="@formModel.Don_Vi_Tien"
-                                                        @onchange="HandleFormDonViTienChanged"
-                                                        disabled="@isSaving">
-                                                    @foreach (var currency in SupportedCurrencies)
-                                                    {
-                                                        <option value="@currency">@currency</option>
-                                                    }
-                                                </select>
-                                            </label>
-                                            <button type="button" class="app-button app-button--secondary" @onclick="AddDetailRow" disabled="@isSaving">
-                                                Thêm dòng
-                                            </button>
+                                    <div class="form-grid nk-form-grid receipt-grid">
+                                        <div class="form-field form-field--code nk-field-card nk-field-card--so-phieu field-card">
+                                            <div class="nk-field-icon" aria-hidden="true">
+                                                <svg viewBox="0 0 24 24">
+                                                    <path d="M7 3h7l5 5v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" />
+                                                    <path d="M14 3v5h5" />
+                                                    <path d="M9 13h6M9 17h6M9 9h3" />
+                                                </svg>
+                                            </div>
+                                            <div class="nk-field-content">
+                                                <div class="form-field__head field-label-row">
+                                                    <label class="form-field__label field-label">Số phiếu nhập <span class="required-mark field-required">*</span></label>
+                                                    <span class="form-field__count field-counter">@((formModel.So_Phieu_Nhap_Kho?.Length ?? 0))/50</span>
+                                                </div>
+                                                <InputText class="form-field__input input-ui"
+                                                           @bind-Value="formModel.So_Phieu_Nhap_Kho"
+                                                           @oninput="HandleSoPhieuInput"
+                                                           maxlength="50"
+                                                           placeholder="Nhập số phiếu nhập kho" />
+                                                <p class="form-field__hint field-help">Không được để trống và phải duy nhất.</p>
+                                                <ValidationMessage For="@(() => formModel.So_Phieu_Nhap_Kho)" />
+                                            </div>
                                         </div>
-                                    }
+
+                                        <div class="form-field form-field--lookup nk-field-card nk-field-card--kho field-card">
+                                            <div class="nk-field-icon" aria-hidden="true">
+                                                <svg viewBox="0 0 24 24">
+                                                    <path d="M3 10.25 12 5l9 5.25v9.25A1.5 1.5 0 0 1 19.5 21h-15A1.5 1.5 0 0 1 3 19.5z" />
+                                                    <path d="M5 11.41V19h14v-7.59L12 7.33z" />
+                                                    <path d="M9 13h6v6H9z" />
+                                                </svg>
+                                            </div>
+                                            <div class="nk-field-content">
+                                                <div class="form-field__head field-label-row">
+                                                    <label class="form-field__label field-label">Kho <span class="required-mark field-required">*</span></label>
+                                                </div>
+                                                <input class="form-field__input form-field__input--readonly select-ui"
+                                                       value="@GetSelectedKhoDisplayName()"
+                                                       placeholder="Chọn kho trên header"
+                                                       readonly
+                                                       aria-readonly="true" />
+                                                <p class="form-field__hint field-help">Kho lấy theo bộ lọc trên header, không chỉnh sửa tại đây.</p>
+                                                <ValidationMessage For="@(() => formModel.Kho_ID)" />
+                                            </div>
+                                        </div>
+
+                                        <div class="form-field form-field--lookup nk-field-card nk-field-card--ncc field-card">
+                                            <div class="nk-field-icon" aria-hidden="true">
+                                                <svg viewBox="0 0 24 24">
+                                                    <path d="M12 12a4.25 4.25 0 1 0 0-8.5 4.25 4.25 0 0 0 0 8.5z" />
+                                                    <path d="M4 21v-1.2c0-3.8 3.7-6.8 8-6.8" />
+                                                    <path d="M15 15h6v6h-6z" />
+                                                </svg>
+                                            </div>
+                                            <div class="nk-field-content">
+                                                <div class="form-field__head field-label-row">
+                                                    <label class="form-field__label field-label">Nhà cung cấp <span class="required-mark field-required">*</span></label>
+                                                </div>
+                                                <InputSelect class="form-field__input select-ui" @bind-Value="formModel.NCC_ID">
+                                                    <option value="0">-- Chọn nhà cung cấp --</option>
+                                                    @foreach (var option in nhaCungCapOptions)
+                                                    {
+                                                        <option value="@option.NCC_ID">@option.Ten_NCC (@option.Ma_NCC)</option>
+                                                    }
+                                                </InputSelect>
+                                                <ValidationMessage For="@(() => formModel.NCC_ID)" />
+                                            </div>
+                                        </div>
+
+                                        <div class="form-field form-field--date nk-field-card nk-field-card--ngay field-card">
+                                            <div class="nk-field-icon" aria-hidden="true">
+                                                <svg viewBox="0 0 24 24">
+                                                    <path d="M7 2v4M17 2v4M3 9h18" />
+                                                    <rect x="3" y="4" width="18" height="18" rx="2" />
+                                                </svg>
+                                            </div>
+                                            <div class="nk-field-content">
+                                                <div class="form-field__head field-label-row">
+                                                    <label class="form-field__label field-label">Ngày nhập kho <span class="required-mark field-required">*</span></label>
+                                                </div>
+                                                <div class="nk-date-input-wrap">
+                                                    <InputText class="form-field__input nk-date-input input-ui"
+                                                               @bind-Value="ngayNhapKhoText"
+                                                               @oninput="HandleNgayNhapKhoInput"
+                                                               maxlength="10"
+                                                               placeholder="dd/MM/yyyy" />
+                                                    <button type="button"
+                                                            class="nk-date-input-icon nk-date-input-button"
+                                                            title="Chọn ngày nhập kho"
+                                                            aria-label="Chọn ngày nhập kho"
+                                                            @onclick="ToggleNgayNhapKhoCalendar"
+                                                            disabled="@isSaving">
+                                                        <svg viewBox="0 0 24 24">
+                                                            <path d="M7 2v4M17 2v4M3 9h18" />
+                                                            <rect x="3" y="4" width="18" height="18" rx="2" />
+                                                        </svg>
+                                                    </button>
+
+                                                    @if (isNgayNhapKhoCalendarOpen)
+                                                    {
+                                                        <div class="nk-calendar-popover" role="dialog" aria-label="Bảng chọn ngày nhập kho">
+                                                            <div class="nk-calendar-header">
+                                                                <div class="nk-calendar-nav">
+                                                                    <button type="button" class="nk-calendar-nav-btn" @onclick="() => MoveNgayNhapKhoCalendarYear(-1)">«</button>
+                                                                    <button type="button" class="nk-calendar-nav-btn" @onclick="() => MoveNgayNhapKhoCalendarMonth(-1)">‹</button>
+                                                                </div>
+                                                                <div class="nk-calendar-title">@GetNgayNhapKhoCalendarMonthTitle()</div>
+                                                                <div class="nk-calendar-nav">
+                                                                    <button type="button" class="nk-calendar-nav-btn" @onclick="() => MoveNgayNhapKhoCalendarMonth(1)">›</button>
+                                                                    <button type="button" class="nk-calendar-nav-btn" @onclick="() => MoveNgayNhapKhoCalendarYear(1)">»</button>
+                                                                </div>
+                                                            </div>
+
+                                                            <div class="nk-calendar-grid">
+                                                                @foreach (var dayName in CalendarDayHeaders)
+                                                                {
+                                                                    <div class="nk-calendar-weekday">@dayName</div>
+                                                                }
+
+                                                                @foreach (var day in GetNgayNhapKhoCalendarDays())
+                                                                {
+                                                                    var dayClasses = "nk-calendar-day";
+                                                                    if (!IsNgayNhapKhoCalendarCurrentMonth(day))
+                                                                    {
+                                                                        dayClasses += " nk-calendar-day--outside";
+                                                                    }
+                                                                    if (IsNgayNhapKhoCalendarSelected(day))
+                                                                    {
+                                                                        dayClasses += " nk-calendar-day--selected";
+                                                                    }
+                                                                    else if (day.Date == DateTime.Today)
+                                                                    {
+                                                                        dayClasses += " nk-calendar-day--today";
+                                                                    }
+
+                                                                    <button type="button"
+                                                                            class="@dayClasses"
+                                                                            @onclick="() => SelectNgayNhapKhoCalendarDate(day)">
+                                                                        @day.Day
+                                                                    </button>
+                                                                }
+                                                            </div>
+
+                                                            <div class="nk-calendar-footer">
+                                                                <button type="button" class="nk-calendar-action nk-calendar-action--clear" @onclick="ClearNgayNhapKhoCalendar">Xóa</button>
+                                                                <button type="button" class="nk-calendar-action nk-calendar-action--today" @onclick="SelectNgayNhapKhoCalendarToday">Hôm nay</button>
+                                                                <button type="button" class="nk-calendar-action nk-calendar-action--confirm" @onclick="ConfirmNgayNhapKhoCalendar">Đồng ý</button>
+                                                            </div>
+                                                        </div>
+                                                    }
+                                                </div>
+                                                <p class="form-field__hint field-help">Định dạng bắt buộc: dd/MM/yyyy.</p>
+                                                <ValidationMessage For="@(() => formModel.Ngay_Nhap_Kho)" />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="form-field form-field--note nk-field-card nk-field-card--note field-card full">
+                                        <div class="nk-field-icon" aria-hidden="true">
+                                            <svg viewBox="0 0 24 24">
+                                                <path d="M7 3h9l5 5v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" />
+                                                <path d="M16 3v5h5" />
+                                                <path d="M9 13h6M9 17h4M9 9h3" />
+                                            </svg>
+                                        </div>
+                                        <div class="nk-field-content">
+                                            <div class="form-field__head field-label-row">
+                                                <label class="form-field__label field-label">Ghi chú</label>
+                                                <span class="form-field__count field-counter">@((formModel.Ghi_Chu?.Length ?? 0))/255</span>
+                                            </div>
+                                            <InputTextArea class="form-field__input form-field__input--multiline textarea-ui"
+                                                           @bind-Value="formModel.Ghi_Chu"
+                                                           @oninput="HandleGhiChuInput"
+                                                           maxlength="255"
+                                                           placeholder="Nhập ghi chú (nếu có)" />
+                                            <ValidationMessage For="@(() => formModel.Ghi_Chu)" />
+                                        </div>
+                                    </div>
+
+                                    <div class="form-actions nk-form-actions receipt-footer receipt-footer--left receipt-footer-inline">
+                                        <button type="button" class="app-button nk-cancel-button btn-cancel" @onclick="CancelForm" disabled="@isSaving">
+                                            Hủy
+                                        </button>
+                                        <button type="submit" class="app-button nk-save-button btn-save" disabled="@(!HasRequiredLookupData || isSaving)">
+                                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                                <path d="M5 4h11l3 3v13H5z" />
+                                                <path d="M8 4v6h8V4M9 18h6" />
+                                            </svg>
+                                            @(isSaving ? "Đang lưu..." : isEditMode ? "Lưu cập nhật" : "Lưu phiếu nhập")
+                                        </button>
+                                    </div>
+                                </section>
+
+                                <section class="line-section nk-line-section detail-card receipt-detail-panel receipt-right">
+                                <header class="line-section__header detail-head receipt-right-header">
+                                    <h3 class="detail-title receipt-section-title">Chi tiết nhập kho</h3>
+                                    <div class="line-section__tools nk-line-tools detail-tools receipt-right-tools">
+                                        <label class="currency-picker nk-currency-picker money-wrap">
+                                            <span class="currency-picker__label money-label">Đơn vị tiền</span>
+                                            <select class="currency-picker__input money-select"
+                                                    value="@formModel.Don_Vi_Tien"
+                                                    @onchange="HandleFormDonViTienChanged"
+                                                    disabled="@(isSaving || isEditMode)">
+                                                @foreach (var currency in SupportedCurrencies)
+                                                {
+                                                    <option value="@currency">@currency</option>
+                                                }
+                                            </select>
+                                        </label>
+                                        <button type="button" class="app-button app-button--secondary nk-add-line-button btn-add-row" @onclick="AddDetailRow" disabled="@(isSaving || isEditMode)">
+                                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                                <path d="M12 5v14M5 12h14" />
+                                            </svg>
+                                            <span>Thêm dòng</span>
+                                        </button>
+                                    </div>
                                 </header>
 
-                                <div class="table-wrap">
-                                    <table class="line-table">
+                                <div class="table-wrap detail-table-wrap">
+                                    <table class="line-table nk-line-table detail-table">
                                         <thead>
                                             <tr>
-                                                <th class="line-table__index">STT</th>
-                                                <th>Sản phẩm <span class="required-mark">*</span></th>
-                                                <th>Đơn vị tính</th>
-                                                <th class="line-table__number">SL nhập <span class="required-mark">*</span></th>
-                                                <th class="line-table__number">Đơn giá nhập <span class="required-mark">*</span></th>
-                                                <th class="line-table__number">Trị giá</th>
-                                                @if (!isEditMode)
-                                                {
-                                                    <th class="line-table__actions">Thao tác</th>
-                                                }
+                                                <th class="line-table__index col-stt">STT</th>
+                                                <th class="col-product">Sản phẩm <span class="required-mark">*</span></th>
+                                                <th class="col-unit">Đơn vị tính</th>
+                                                <th class="line-table__number col-qty">SL nhập <span class="required-mark">*</span></th>
+                                                <th class="line-table__number col-price">Đơn giá nhập <span class="required-mark">*</span></th>
+                                                <th class="line-table__number col-total">Trị giá</th>
+                                                <th class="line-table__actions col-action">Thao tác</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -388,92 +515,97 @@
                                                 <tr>
                                                     <td>@(index + 1)</td>
                                                     <td>
-                                                        <InputSelect class="form-field__input"
-                                                                     @bind-Value="line.San_Pham_ID"
-                                                                     disabled="@isEditMode">
-                                                            <option value="0">-- Chọn sản phẩm --</option>
-                                                            @foreach (var option in sanPhamOptions)
+                                                        <div class="combo-box">
+                                                            <input class="form-field__input combo-ui"
+                                                                   value="@(isEditMode ? GetSanPhamNameById(line.San_Pham_ID) : GetLineSanPhamKeyword(line))"
+                                                                   @onfocus="() => OpenSanPhamDropdown(line)"
+                                                                   @oninput="e => HandleLineSanPhamKeywordInput(line, e)"
+                                                                   @onkeydown="e => HandleLineSanPhamKeyDown(line, e)"
+                                                                   @onblur="() => HandleLineSanPhamBlurAsync(line)"
+                                                                   placeholder="Nhập mã / tên sản phẩm"
+                                                                   autocomplete="off"
+                                                                   disabled="@(isSaving || isEditMode)" />
+                                                            <span class="combo-arrow">⌄</span>
+                                                            @if (!isEditMode && IsSanPhamDropdownOpen(line))
                                                             {
-                                                                <option value="@option.San_Pham_ID">@option.Ten_San_Pham (@option.Ma_San_Pham)</option>
+                                                                var filteredSanPhamOptions = GetFilteredSanPhamOptions(line);
+                                                                <div class="combo-dropdown">
+                                                                    @if (filteredSanPhamOptions.Count == 0)
+                                                                    {
+                                                                        <div class="combo-option combo-option--empty">
+                                                                            <span class="combo-name">Không tìm thấy sản phẩm phù hợp.</span>
+                                                                        </div>
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        @foreach (var option in filteredSanPhamOptions)
+                                                                        {
+                                                                            <div class="@(line.San_Pham_ID == option.San_Pham_ID ? "combo-option active" : "combo-option")"
+                                                                                 @onmousedown="() => SelectSanPhamForLine(line, option)">
+                                                                                <span class="combo-code">@option.Ma_San_Pham</span>
+                                                                                <span class="combo-name">@option.Ten_San_Pham</span>
+                                                                            </div>
+                                                                        }
+                                                                    }
+                                                                </div>
                                                             }
-                                                        </InputSelect>
+                                                        </div>
                                                     </td>
                                                     <td class="line-table__unit">
-                                                        @GetDonViTinhBySanPhamId(line.San_Pham_ID)
+                                                        <span class="unit-readonly">@GetDonViTinhBySanPhamId(line.San_Pham_ID)</span>
                                                     </td>
                                                     <td>
-                                                        @if (isEditMode)
-                                                        {
-                                                            <span class="line-table__number">@FormatQuantity(GetLineSoLuong(line))</span>
-                                                        }
-                                                        else
-                                                        {
-                                                            <div class="quantity-stepper">
-                                                                <button type="button"
-                                                                        class="quantity-stepper__button"
-                                                                        @onclick="() => DecreaseFormLineQuantity(line)"
-                                                                        disabled="@isSaving">
-                                                                    −
-                                                                </button>
-                                                                <input class="quantity-stepper__input"
-                                                                       value="@line.SL_Nhap_Text"
-                                                                       @oninput="e => line.SL_Nhap_Text = KeepDigitsOnly(e.Value?.ToString())"
-                                                                       inputmode="numeric"
-                                                                       placeholder="0" />
-                                                                <button type="button"
-                                                                        class="quantity-stepper__button"
-                                                                        @onclick="() => IncreaseFormLineQuantity(line)"
-                                                                        disabled="@isSaving">
-                                                                    +
-                                                                </button>
-                                                            </div>
-                                                        }
+                                                        <div class="quantity-stepper qty-box">
+                                                            <button type="button"
+                                                                    class="quantity-stepper__button qty-btn"
+                                                                    @onclick="() => DecreaseFormLineQuantity(line)"
+                                                                    disabled="@(isSaving || isEditMode)">
+                                                                −
+                                                            </button>
+                                                            <input class="quantity-stepper__input qty-input"
+                                                                   value="@(isEditMode ? FormatQuantity(GetLineSoLuong(line)) : line.SL_Nhap_Text)"
+                                                                   @oninput="e => line.SL_Nhap_Text = KeepDigitsOnly(e.Value?.ToString())"
+                                                                   inputmode="numeric"
+                                                                   placeholder="0"
+                                                                   disabled="@(isSaving || isEditMode)" />
+                                                            <button type="button"
+                                                                    class="quantity-stepper__button qty-btn"
+                                                                    @onclick="() => IncreaseFormLineQuantity(line)"
+                                                                    disabled="@(isSaving || isEditMode)">
+                                                                +
+                                                            </button>
+                                                        </div>
                                                     </td>
                                                     <td>
-                                                        <input class="form-field__input line-input--number"
+                                                        <input class="form-field__input line-input--number price-input"
                                                                value="@line.Don_Gia_Nhap_Text"
                                                                @oninput="e => line.Don_Gia_Nhap_Text = e.Value?.ToString() ?? string.Empty"
                                                                @onblur="() => NormalizeFormLineDonGiaText(line)"
-                                                               disabled="@isEditMode"
+                                                               disabled="@(isSaving || isEditMode)"
                                                                inputmode="decimal"
                                                                placeholder="Nhập đơn giá" />
                                                     </td>
                                                     <td class="line-table__number">@FormatAmountWithCurrency(GetLineTriGia(line), formModel.Don_Vi_Tien)</td>
-                                                    @if (!isEditMode)
-                                                    {
-                                                        <td>
-                                                            <button type="button"
-                                                                    class="app-button app-button--danger"
-                                                                    @onclick="() => RemoveDetailRow(index)"
-                                                                    disabled="@isSaving">
-                                                                Xóa dòng
-                                                            </button>
-                                                        </td>
-                                                    }
+                                                    <td>
+                                                        <button type="button"
+                                                                class="app-button app-button--danger btn-delete-row"
+                                                                @onclick="() => RemoveDetailRow(index)"
+                                                                disabled="@(isSaving || isEditMode)">
+                                                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                                                <path d="M8 7h8m-7 0V5h6v2m-7 3v7m4-7v7m4-11v13a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V6h10z" />
+                                                            </svg>
+                                                        </button>
+                                                    </td>
                                                 </tr>
                                             }
                                         </tbody>
-                                        <tfoot>
-                                            <tr>
-                                                <td colspan="5">Tổng trị giá</td>
-                                                <td class="line-table__number">@FormatAmountWithCurrency(formModel.Chi_Tiets.Sum(GetLineTriGia), formModel.Don_Vi_Tien)</td>
-                                                @if (!isEditMode)
-                                                {
-                                                    <td></td>
-                                                }
-                                            </tr>
-                                        </tfoot>
                                     </table>
                                 </div>
-                            </section>
-
-                            <div class="form-actions">
-                                <button type="submit" class="app-button app-button--success" disabled="@(!HasRequiredLookupData || isSaving)">
-                                    @(isSaving ? "Đang lưu..." : isEditMode ? "Lưu cập nhật" : "Lưu phiếu nhập")
-                                </button>
-                                <button type="button" class="app-button app-button--secondary" @onclick="CancelForm" disabled="@isSaving">
-                                    Hủy
-                                </button>
+                                <div class="total-row receipt-total-box">
+                                    <span class="total-label">Tổng trị giá</span>
+                                    <span class="total-value">@FormatAmountWithCurrency(formModel.Chi_Tiets.Sum(GetLineTriGia), formModel.Don_Vi_Tien)</span>
+                                </div>
+                                </section>
                             </div>
                         </EditForm>
                     </div>
@@ -728,6 +860,8 @@
     private readonly List<KhoListItemVm> khoOptions = [];
     private readonly List<NhaCungCapListItemVm> nhaCungCapOptions = [];
     private readonly List<SanPhamListItemVm> sanPhamOptions = [];
+    private readonly Dictionary<NhapKhoRawDataUpsertVm, string> lineSanPhamKeywords = [];
+    private readonly HashSet<NhapKhoRawDataUpsertVm> openedLineSanPhamDropdowns = [];
     private readonly List<NhapKhoDetailListItemVm> selectedDetails = [];
     private readonly List<NhapKhoDetailEditorLineVm> detailEditorLines = [];
     private NhapKhoCreateVm formModel = new();
@@ -759,6 +893,9 @@
     private bool detailEditorMessageIsError;
     private string searchKeyword = string.Empty;
     private string ngayNhapKhoText = string.Empty;
+    private bool isNgayNhapKhoCalendarOpen;
+    private DateTime ngayNhapKhoCalendarMonth = new(DateTime.Today.Year, DateTime.Today.Month, 1);
+    private DateTime? ngayNhapKhoCalendarSelection;
     private const string ImportHeaderSoPhieuNhap = "Số phiếu nhập";
     private const string ImportHeaderNgayNhapKho = "Ngày nhập kho";
     private const string ImportHeaderNhaCungCap = "Nhà cung cấp";
@@ -767,6 +904,8 @@
     private const string ImportHeaderDonGiaNhap = "Đơn giá nhập";
     private const string ImportHeaderDonViTien = "Đơn vị tiền";
     private const string ImportHeaderGhiChu = "Ghi chú";
+    private const int MaxSanPhamComboboxOptions = 8;
+    private static readonly IReadOnlyList<string> CalendarDayHeaders = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
 
     private static readonly IReadOnlyList<string> ImportPreviewHeaders =
     [
@@ -935,8 +1074,12 @@
             Ngay_Nhap_Kho = DateTime.Today,
             Don_Vi_Tien = DonViTienOptions.Vnd
         };
+        ResetLineSanPhamComboboxState();
         ReformatFormLineValues();
         ngayNhapKhoText = formModel.Ngay_Nhap_Kho.ToString("dd/MM/yyyy");
+        isNgayNhapKhoCalendarOpen = false;
+        ngayNhapKhoCalendarSelection = null;
+        ngayNhapKhoCalendarMonth = new DateTime(formModel.Ngay_Nhap_Kho.Year, formModel.Ngay_Nhap_Kho.Month, 1);
     }
 
     private void HandleSelectionChanged()
@@ -945,7 +1088,7 @@
         {
             await LoadDataAsync();
 
-            if (IsFormVisible && !isEditMode)
+            if (IsFormVisible)
             {
                 ApplySelectedKhoToForm();
             }
@@ -962,6 +1105,31 @@
         }
 
         formModel.Kho_ID = AppSelectionContext.SelectedKhoId.Value;
+    }
+
+    private string GetSelectedKhoDisplayName()
+    {
+        if (!string.IsNullOrWhiteSpace(AppSelectionContext.SelectedKhoName))
+        {
+            return AppSelectionContext.SelectedKhoName;
+        }
+
+        return khoOptions.FirstOrDefault(x => x.Kho_ID == formModel.Kho_ID)?.Ten_Kho ?? string.Empty;
+    }
+
+    private bool TrySyncKhoFromHeader(out string validationMessage)
+    {
+        validationMessage = string.Empty;
+        var selectedKhoId = AppSelectionContext.SelectedKhoId;
+        if (!selectedKhoId.HasValue || selectedKhoId.Value <= 0)
+        {
+            formModel.Kho_ID = 0;
+            validationMessage = "Vui lòng chọn kho trên bộ lọc header trước khi lưu phiếu nhập.";
+            return false;
+        }
+
+        formModel.Kho_ID = selectedKhoId.Value;
+        return true;
     }
 
     private async Task StartEditAsync(NhapKhoListItemVm item)
@@ -1007,7 +1175,7 @@
             {
                 Nhap_Kho_ID = item.Nhap_Kho_ID,
                 So_Phieu_Nhap_Kho = item.So_Phieu_Nhap_Kho,
-                Kho_ID = item.Kho_ID,
+                Kho_ID = AppSelectionContext.SelectedKhoId ?? item.Kho_ID,
                 NCC_ID = item.NCC_ID,
                 Ngay_Nhap_Kho = item.Ngay_Nhap_Kho,
                 Don_Vi_Tien = donViTien,
@@ -1015,9 +1183,13 @@
                 Chi_Tiets = detailRows
             };
 
+            InitializeLineSanPhamComboboxState(detailRows);
             ReformatFormLineValues();
 
             ngayNhapKhoText = formModel.Ngay_Nhap_Kho.ToString("dd/MM/yyyy");
+            isNgayNhapKhoCalendarOpen = false;
+            ngayNhapKhoCalendarSelection = null;
+            ngayNhapKhoCalendarMonth = new DateTime(formModel.Ngay_Nhap_Kho.Year, formModel.Ngay_Nhap_Kho.Month, 1);
             isEditMode = true;
             editingNhapKhoId = item.Nhap_Kho_ID;
             isCreateFormVisible = true;
@@ -1294,13 +1466,15 @@
 
     private void AddDetailRow()
     {
-        formModel.Chi_Tiets.Add(new NhapKhoRawDataUpsertVm
+        var line = new NhapKhoRawDataUpsertVm
         {
             SL_Nhap = 1m,
             SL_Nhap_Text = "1",
             Don_Gia_Nhap = 0m,
             Don_Gia_Nhap_Text = FormatAmountInput(0m, formModel.Don_Vi_Tien)
-        });
+        };
+        formModel.Chi_Tiets.Add(line);
+        lineSanPhamKeywords[line] = string.Empty;
     }
 
     private void DecreaseFormLineQuantity(NhapKhoRawDataUpsertVm line)
@@ -1345,6 +1519,9 @@
             return;
         }
 
+        var line = formModel.Chi_Tiets[index];
+        openedLineSanPhamDropdowns.Remove(line);
+        lineSanPhamKeywords.Remove(line);
         formModel.Chi_Tiets.RemoveAt(index);
     }
 
@@ -1389,6 +1566,13 @@
         if (!HasRequiredLookupData)
         {
             formMessage = "Cần có dữ liệu Kho, Nhà cung cấp và Sản phẩm trước khi lưu.";
+            formMessageIsError = true;
+            return;
+        }
+
+        if (!TrySyncKhoFromHeader(out var khoValidationMessage))
+        {
+            formMessage = khoValidationMessage;
             formMessageIsError = true;
             return;
         }
@@ -1535,10 +1719,283 @@
         ngayNhapKhoText = args.Value?.ToString() ?? string.Empty;
     }
 
-    private void HandleFormDonViTienChanged(ChangeEventArgs args)
+    private void ToggleNgayNhapKhoCalendar()
     {
-        formModel.Don_Vi_Tien = DonViTienOptions.Normalize(args.Value?.ToString());
-        ReformatFormLineValues();
+        if (isSaving)
+        {
+            return;
+        }
+
+        if (isNgayNhapKhoCalendarOpen)
+        {
+            isNgayNhapKhoCalendarOpen = false;
+            return;
+        }
+
+        InitNgayNhapKhoCalendarState();
+        isNgayNhapKhoCalendarOpen = true;
+    }
+
+    private void InitNgayNhapKhoCalendarState()
+    {
+        if (TryParseNgayNhapKho(out var parsedDate))
+        {
+            ngayNhapKhoCalendarSelection = parsedDate.Date;
+            ngayNhapKhoCalendarMonth = new DateTime(parsedDate.Year, parsedDate.Month, 1);
+            return;
+        }
+
+        var fallback = formModel.Ngay_Nhap_Kho == default ? DateTime.Today : formModel.Ngay_Nhap_Kho.Date;
+        ngayNhapKhoCalendarSelection = fallback;
+        ngayNhapKhoCalendarMonth = new DateTime(fallback.Year, fallback.Month, 1);
+    }
+
+    private string GetNgayNhapKhoCalendarMonthTitle()
+    {
+        return $"Tháng {ngayNhapKhoCalendarMonth.Month}, {ngayNhapKhoCalendarMonth.Year}";
+    }
+
+    private IReadOnlyList<DateTime> GetNgayNhapKhoCalendarDays()
+    {
+        var firstDayOfMonth = new DateTime(ngayNhapKhoCalendarMonth.Year, ngayNhapKhoCalendarMonth.Month, 1);
+        var offset = ((int)firstDayOfMonth.DayOfWeek + 6) % 7;
+        var gridStart = firstDayOfMonth.AddDays(-offset);
+
+        return Enumerable.Range(0, 42)
+            .Select(index => gridStart.AddDays(index))
+            .ToList();
+    }
+
+    private bool IsNgayNhapKhoCalendarCurrentMonth(DateTime day)
+    {
+        return day.Month == ngayNhapKhoCalendarMonth.Month
+            && day.Year == ngayNhapKhoCalendarMonth.Year;
+    }
+
+    private bool IsNgayNhapKhoCalendarSelected(DateTime day)
+    {
+        return ngayNhapKhoCalendarSelection.HasValue
+            && ngayNhapKhoCalendarSelection.Value.Date == day.Date;
+    }
+
+    private void MoveNgayNhapKhoCalendarMonth(int months)
+    {
+        ngayNhapKhoCalendarMonth = ngayNhapKhoCalendarMonth.AddMonths(months);
+    }
+
+    private void MoveNgayNhapKhoCalendarYear(int years)
+    {
+        ngayNhapKhoCalendarMonth = ngayNhapKhoCalendarMonth.AddYears(years);
+    }
+
+    private void SelectNgayNhapKhoCalendarDate(DateTime day)
+    {
+        ngayNhapKhoCalendarSelection = day.Date;
+        if (!IsNgayNhapKhoCalendarCurrentMonth(day))
+        {
+            ngayNhapKhoCalendarMonth = new DateTime(day.Year, day.Month, 1);
+        }
+    }
+
+    private void ClearNgayNhapKhoCalendar()
+    {
+        ngayNhapKhoCalendarSelection = null;
+        ngayNhapKhoText = string.Empty;
+        isNgayNhapKhoCalendarOpen = false;
+    }
+
+    private void SelectNgayNhapKhoCalendarToday()
+    {
+        var today = DateTime.Today;
+        ngayNhapKhoCalendarSelection = today;
+        ngayNhapKhoCalendarMonth = new DateTime(today.Year, today.Month, 1);
+    }
+
+    private void ConfirmNgayNhapKhoCalendar()
+    {
+        if (ngayNhapKhoCalendarSelection.HasValue)
+        {
+            ngayNhapKhoText = ngayNhapKhoCalendarSelection.Value.ToString("dd/MM/yyyy");
+        }
+
+        isNgayNhapKhoCalendarOpen = false;
+    }
+
+    private string GetLineSanPhamKeyword(NhapKhoRawDataUpsertVm line)
+    {
+        if (lineSanPhamKeywords.TryGetValue(line, out var keyword))
+        {
+            return keyword;
+        }
+
+        var selected = sanPhamOptions.FirstOrDefault(x => x.San_Pham_ID == line.San_Pham_ID);
+        keyword = selected?.Ten_San_Pham ?? string.Empty;
+        lineSanPhamKeywords[line] = keyword;
+        return keyword;
+    }
+
+    private IReadOnlyList<SanPhamListItemVm> GetFilteredSanPhamOptions(NhapKhoRawDataUpsertVm line)
+    {
+        var keyword = GetLineSanPhamKeyword(line).Trim();
+        IEnumerable<SanPhamListItemVm> query = sanPhamOptions;
+
+        if (!string.IsNullOrWhiteSpace(keyword))
+        {
+            query = query.Where(x =>
+                ContainsKeyword(x.Ma_San_Pham, keyword)
+                || ContainsKeyword(x.Ten_San_Pham, keyword));
+        }
+
+        return query
+            .Take(MaxSanPhamComboboxOptions)
+            .ToList();
+    }
+
+    private bool IsSanPhamDropdownOpen(NhapKhoRawDataUpsertVm line)
+    {
+        return openedLineSanPhamDropdowns.Contains(line);
+    }
+
+    private void OpenSanPhamDropdown(NhapKhoRawDataUpsertVm line)
+    {
+        if (isEditMode || isSaving)
+        {
+            return;
+        }
+
+        openedLineSanPhamDropdowns.Add(line);
+    }
+
+    private void HandleLineSanPhamKeywordInput(NhapKhoRawDataUpsertVm line, ChangeEventArgs args)
+    {
+        if (isEditMode || isSaving)
+        {
+            return;
+        }
+
+        var keyword = args.Value?.ToString() ?? string.Empty;
+        lineSanPhamKeywords[line] = keyword;
+        openedLineSanPhamDropdowns.Add(line);
+
+        if (line.San_Pham_ID <= 0)
+        {
+            return;
+        }
+
+        var selected = sanPhamOptions.FirstOrDefault(x => x.San_Pham_ID == line.San_Pham_ID);
+        if (selected is null)
+        {
+            line.San_Pham_ID = 0;
+            return;
+        }
+
+        if (!string.Equals(keyword, selected.Ten_San_Pham, StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(keyword, selected.Ma_San_Pham, StringComparison.OrdinalIgnoreCase))
+        {
+            line.San_Pham_ID = 0;
+        }
+    }
+
+    private void HandleLineSanPhamKeyDown(NhapKhoRawDataUpsertVm line, KeyboardEventArgs args)
+    {
+        if (isEditMode || isSaving)
+        {
+            return;
+        }
+
+        if (string.Equals(args.Key, "Escape", StringComparison.Ordinal))
+        {
+            openedLineSanPhamDropdowns.Remove(line);
+            return;
+        }
+
+        if (string.Equals(args.Key, "ArrowDown", StringComparison.Ordinal))
+        {
+            openedLineSanPhamDropdowns.Add(line);
+            return;
+        }
+
+        if (string.Equals(args.Key, "Enter", StringComparison.Ordinal))
+        {
+            var selected = GetFilteredSanPhamOptions(line).FirstOrDefault();
+            if (selected is null)
+            {
+                openedLineSanPhamDropdowns.Remove(line);
+                return;
+            }
+
+            SelectSanPhamForLine(line, selected);
+        }
+    }
+
+    private async Task HandleLineSanPhamBlurAsync(NhapKhoRawDataUpsertVm line)
+    {
+        await Task.Delay(120);
+        openedLineSanPhamDropdowns.Remove(line);
+
+        if (line.San_Pham_ID > 0)
+        {
+            return;
+        }
+
+        var keyword = GetLineSanPhamKeyword(line).Trim();
+        if (keyword.Length == 0)
+        {
+            return;
+        }
+
+        var exact = sanPhamOptions.FirstOrDefault(x =>
+            string.Equals(x.Ma_San_Pham, keyword, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(x.Ten_San_Pham, keyword, StringComparison.OrdinalIgnoreCase));
+
+        if (exact is not null)
+        {
+            SelectSanPhamForLine(line, exact);
+        }
+    }
+
+    private void SelectSanPhamForLine(NhapKhoRawDataUpsertVm line, SanPhamListItemVm option)
+    {
+        line.San_Pham_ID = option.San_Pham_ID;
+        lineSanPhamKeywords[line] = option.Ten_San_Pham;
+        openedLineSanPhamDropdowns.Remove(line);
+    }
+
+    private void ResetLineSanPhamComboboxState()
+    {
+        lineSanPhamKeywords.Clear();
+        openedLineSanPhamDropdowns.Clear();
+    }
+
+    private void InitializeLineSanPhamComboboxState(IEnumerable<NhapKhoRawDataUpsertVm> lines)
+    {
+        ResetLineSanPhamComboboxState();
+
+        foreach (var line in lines)
+        {
+            var selected = sanPhamOptions.FirstOrDefault(x => x.San_Pham_ID == line.San_Pham_ID);
+            lineSanPhamKeywords[line] = selected?.Ten_San_Pham ?? string.Empty;
+        }
+    }
+
+    private async Task HandleFormDonViTienChanged(ChangeEventArgs args)
+    {
+        var fromDonViTien = DonViTienOptions.Normalize(formModel.Don_Vi_Tien);
+        var toDonViTien = DonViTienOptions.Normalize(args.Value?.ToString());
+        if (string.Equals(fromDonViTien, toDonViTien, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        var rateResult = await CurrencyExchangeRateService.GetExchangeRateAsync(fromDonViTien, toDonViTien);
+        if (!rateResult.Success)
+        {
+            formMessage = rateResult.Message;
+            formMessageIsError = true;
+            return;
+        }
+
+        ConvertFormCurrency(fromDonViTien, toDonViTien, rateResult.Data);
     }
 
     private async Task HandleDetailEditorDonViTienChanged(ChangeEventArgs args)
@@ -2463,6 +2920,30 @@
 
             line.Don_Gia_Nhap_Text = FormatAmountInput(line.Don_Gia_Nhap, formModel.Don_Vi_Tien);
         }
+    }
+
+    private void ConvertFormCurrency(string fromDonViTien, string toDonViTien, decimal exchangeRate)
+    {
+        if (exchangeRate <= 0m)
+        {
+            return;
+        }
+
+        formModel.Don_Vi_Tien = toDonViTien;
+        foreach (var line in formModel.Chi_Tiets)
+        {
+            if (TryParsePositiveDecimal(line.Don_Gia_Nhap_Text, fromDonViTien, out var rawDonGia))
+            {
+                line.Don_Gia_Nhap = DonViTienOptions.RoundAmount(rawDonGia, fromDonViTien);
+            }
+
+            var convertedDonGia = line.Don_Gia_Nhap * exchangeRate;
+            line.Don_Gia_Nhap = DonViTienOptions.RoundAmount(convertedDonGia, toDonViTien);
+            line.Don_Gia_Nhap_Text = FormatAmountInput(line.Don_Gia_Nhap, toDonViTien);
+        }
+
+        formMessage = $"Đã cập nhật tỉ giá {fromDonViTien}->{toDonViTien}: {exchangeRate.ToString("N4", CultureInfo.InvariantCulture)}.";
+        formMessageIsError = false;
     }
 
     private void NormalizeFormLineDonGiaText(NhapKhoRawDataUpsertVm line)

@@ -1,0 +1,4 @@
+interface:
+  display_name: "CSS Override Guard"
+  short_description: "Prevent CSS overrides and style regressions in Blazor pages"
+  default_prompt: "Use this skill to implement CSS changes without unintended selector conflicts or overrides."

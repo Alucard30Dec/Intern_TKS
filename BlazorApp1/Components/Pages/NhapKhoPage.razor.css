@@ -422,7 +422,8 @@
     color: #dc2626;
 }
 
-.form-field__input {
+.form-field__input,
+.form-shell ::deep .form-field__input {
     background: #fff;
     border: 1px solid var(--ui-border-strong);
     border-radius: 10px;
@@ -437,13 +438,26 @@
     width: 100%;
 }
 
-.form-field__input:focus {
+.form-field__input:focus,
+.form-shell ::deep .form-field__input:focus {
     border-color: #2f7ab9;
     box-shadow: 0 0 0 3px rgba(47, 122, 185, 0.18);
     outline: none;
 }
 
-.form-field__input--multiline {
+.form-field__input--readonly {
+    background: #f8fafc;
+    color: #334155;
+    cursor: not-allowed;
+}
+
+.form-field__input--readonly:focus {
+    border-color: var(--ui-border-strong);
+    box-shadow: none;
+}
+
+.form-field__input--multiline,
+.form-shell ::deep .form-field__input--multiline {
     min-height: 96px;
     resize: vertical;
 }
@@ -539,10 +553,10 @@
 .quantity-stepper {
     align-items: stretch;
     border: 1px solid #c9d4e3;
-    border-radius: 18px;
+    border-radius: 12px;
     display: inline-grid;
-    grid-template-columns: 58px 120px 58px;
-    min-height: 42px;
+    grid-template-columns: 42px 92px 42px;
+    min-height: 40px;
     overflow: hidden;
 }
 
@@ -551,7 +565,7 @@
     border: none;
     color: #334155;
     cursor: pointer;
-    font-size: 1.75rem;
+    font-size: 1.35rem;
     font-weight: 500;
     line-height: 1;
 }
@@ -572,7 +586,7 @@
     border: none;
     color: #0f172a;
     font: inherit;
-    font-size: 1.05rem;
+    font-size: 0.98rem;
     font-weight: 700;
     padding: 0 0.45rem;
     text-align: center;
@@ -585,6 +599,56 @@
 
 .line-editor__row--editing {
     background: #f8fbff;
+}
+
+.modal-card--detail .line-table--editor {
+    table-layout: fixed;
+}
+
+.modal-card--detail .line-table--editor td {
+    vertical-align: middle;
+}
+
+.modal-card--detail .line-table--editor th:nth-child(4),
+.modal-card--detail .line-table--editor td:nth-child(4) {
+    width: 176px;
+}
+
+.modal-card--detail .line-table--editor th:nth-child(5),
+.modal-card--detail .line-table--editor td:nth-child(5) {
+    width: 190px;
+}
+
+.modal-card--detail .line-table--editor th:nth-child(7),
+.modal-card--detail .line-table--editor td:nth-child(7) {
+    width: 150px;
+}
+
+.modal-card--detail .line-table--editor td:nth-child(2),
+.modal-card--detail .line-table--editor td:nth-child(3) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.modal-card--detail .line-table--editor .action-group {
+    flex-wrap: nowrap;
+}
+
+.modal-card--detail .line-table--editor .quantity-stepper {
+    min-height: 36px;
+}
+
+.modal-card--detail .line-table--editor .quantity-stepper__input {
+    font-size: 0.88rem;
+    font-weight: 400;
+}
+
+.modal-card--detail .line-table--editor .line-input--number {
+    font-size: 0.88rem;
+    font-weight: 400;
+    min-height: 36px;
+    padding: 0.35rem 0.56rem;
 }
 
 .action-group,
@@ -726,3 +790,985 @@
         max-height: calc(100vh - 1.5rem);
     }
 }
+
+/* ===== Receipt modal skin (match provided reference) ===== */
+.receipt-modal-overlay {
+    padding: 8px 10px;
+}
+
+.receipt-modal.modal-card--nhap-form {
+    max-width: min(1700px, calc(100vw - 16px));
+    width: min(1700px, calc(100vw - 16px));
+}
+
+.receipt-modal {
+    --receipt-row-control-height: 36px;
+    --receipt-row-control-radius: 10px;
+    --receipt-row-control-font-size: 13px;
+    background: #ffffff;
+    border: 1px solid #d9e5f2;
+    border-radius: 18px;
+    box-shadow: 0 20px 48px rgba(17, 38, 68, 0.18);
+    color: #183153;
+    max-height: calc(100vh - 16px);
+    overflow: auto;
+}
+
+.receipt-modal .receipt-header {
+    align-items: center;
+    background: #ffffff;
+    border-bottom: 1px solid #e7eef7;
+    display: flex;
+    justify-content: space-between;
+    padding: 14px 20px;
+}
+
+.receipt-modal .receipt-title {
+    color: #1c2f4a;
+    font-size: 16px;
+    font-weight: 800;
+    line-height: 1.3;
+    margin: 0;
+}
+
+.receipt-modal .receipt-header-right {
+    align-items: center;
+    display: flex;
+    gap: 10px;
+}
+
+.receipt-modal .receipt-badge {
+    align-items: center;
+    background: #eef8ff;
+    border: 1px solid #bfe0fb;
+    border-radius: 999px;
+    color: #2666a8;
+    display: inline-flex;
+    font-size: 14px;
+    font-weight: 700;
+    height: 34px;
+    justify-content: center;
+    padding: 0 16px;
+}
+
+.receipt-modal .receipt-close {
+    align-items: center;
+    background: #f8fbff;
+    border: 1px solid #cfdced;
+    border-radius: 12px;
+    color: #51657f;
+    display: inline-flex;
+    font-size: 18px;
+    font-weight: 700;
+    height: 36px;
+    justify-content: center;
+    width: 36px;
+}
+
+.receipt-modal .nk-close-button svg {
+    fill: none;
+    height: 18px;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 2.2;
+    width: 18px;
+}
+
+.receipt-modal .receipt-body {
+    background: #f7fbff;
+    padding: 16px;
+}
+
+.receipt-modal .receipt-workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.06fr);
+    gap: 18px;
+    align-items: start;
+    min-height: clamp(620px, 76vh, 860px);
+}
+
+.receipt-modal .receipt-info-panel,
+.receipt-modal .receipt-detail-panel {
+    background: #ffffff;
+    border: 1px solid #dbe6f2;
+    border-radius: 18px;
+    min-width: 0;
+    padding: 18px;
+    min-height: clamp(580px, 72vh, 820px);
+}
+
+.receipt-modal .receipt-info-panel {
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
+}
+
+.receipt-modal .receipt-detail-panel {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 0;
+    min-height: 100%;
+}
+
+.receipt-modal .receipt-panel-title {
+    color: #1c2f4a;
+    font-size: 15px;
+    font-weight: 800;
+    margin: 2px 0 10px;
+}
+
+.receipt-modal .receipt-section-title {
+    color: #1c2f4a;
+    font-size: 16px;
+    font-weight: 800;
+}
+
+.receipt-modal .receipt-grid {
+    display: grid;
+    gap: 16px;
+    grid-template-columns: 1fr 1fr;
+    margin-bottom: 12px;
+}
+
+.receipt-modal .field-card {
+    background: #ffffff;
+    border: 1px solid #dbe6f3;
+    border-radius: 14px;
+    margin-bottom: 0;
+    min-height: 0;
+    padding: 12px;
+}
+
+.receipt-modal .field-card.full {
+    grid-column: 1 / -1;
+}
+
+.receipt-modal .field-label-row {
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+
+.receipt-modal .field-label {
+    color: #1e3553;
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.receipt-modal .field-required {
+    color: #ef4444;
+    margin-left: 4px;
+}
+
+.receipt-modal .field-counter {
+    color: #7d91aa;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.receipt-modal .field-help {
+    color: #7387a2;
+    font-size: 12px;
+    line-height: 1.4;
+    margin-top: 6px;
+}
+
+.receipt-modal .nk-field-card--kho .field-help {
+    display: none;
+}
+
+.receipt-modal .input-ui,
+.receipt-modal .select-ui,
+.receipt-modal .textarea-ui,
+.receipt-modal .combo-ui,
+.receipt-modal .money-select,
+.receipt-modal .price-input,
+.receipt-modal ::deep .input-ui,
+.receipt-modal ::deep .select-ui,
+.receipt-modal ::deep .textarea-ui,
+.receipt-modal ::deep .combo-ui,
+.receipt-modal ::deep .money-select,
+.receipt-modal ::deep .price-input {
+    background: #ffffff;
+    border: 1.5px solid #cfdceb;
+    border-radius: 14px;
+    box-sizing: border-box;
+    color: #17324d;
+    font-size: 14px;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.receipt-modal .input-ui,
+.receipt-modal .select-ui,
+.receipt-modal .combo-ui,
+.receipt-modal ::deep .input-ui,
+.receipt-modal ::deep .select-ui,
+.receipt-modal ::deep .combo-ui {
+    height: 40px;
+    padding: 0 12px;
+}
+
+.receipt-modal .textarea-ui,
+.receipt-modal ::deep .textarea-ui {
+    line-height: 1.5;
+    min-height: 72px;
+    padding: 10px 12px;
+    resize: vertical;
+}
+
+.receipt-modal .input-ui:hover,
+.receipt-modal .select-ui:hover,
+.receipt-modal .textarea-ui:hover,
+.receipt-modal .combo-ui:hover,
+.receipt-modal .money-select:hover,
+.receipt-modal .price-input:hover,
+.receipt-modal ::deep .input-ui:hover,
+.receipt-modal ::deep .select-ui:hover,
+.receipt-modal ::deep .textarea-ui:hover,
+.receipt-modal ::deep .combo-ui:hover,
+.receipt-modal ::deep .money-select:hover,
+.receipt-modal ::deep .price-input:hover {
+    background: #fcfeff;
+    border-color: #a9c6e8;
+}
+
+.receipt-modal .input-ui:focus,
+.receipt-modal .select-ui:focus,
+.receipt-modal .textarea-ui:focus,
+.receipt-modal .combo-ui:focus,
+.receipt-modal .money-select:focus,
+.receipt-modal .price-input:focus,
+.receipt-modal ::deep .input-ui:focus,
+.receipt-modal ::deep .select-ui:focus,
+.receipt-modal ::deep .textarea-ui:focus,
+.receipt-modal ::deep .combo-ui:focus,
+.receipt-modal ::deep .money-select:focus,
+.receipt-modal ::deep .price-input:focus {
+    border-color: #2b7de9;
+    box-shadow: 0 0 0 4px rgba(43, 125, 233, 0.12);
+    outline: none;
+}
+
+.receipt-modal .input-ui::placeholder,
+.receipt-modal .textarea-ui::placeholder,
+.receipt-modal .combo-ui::placeholder,
+.receipt-modal ::deep .input-ui::placeholder,
+.receipt-modal ::deep .textarea-ui::placeholder,
+.receipt-modal ::deep .combo-ui::placeholder {
+    color: #98a8bc;
+}
+
+.receipt-modal .nk-field-card {
+    align-items: flex-start;
+    display: grid;
+    gap: 10px;
+    grid-template-columns: 64px minmax(0, 1fr);
+    margin-bottom: 10px;
+}
+
+.receipt-modal .nk-field-icon {
+    align-items: center;
+    border-radius: 999px;
+    display: inline-flex;
+    height: 54px;
+    justify-content: center;
+    margin-top: 0;
+    width: 54px;
+}
+
+.receipt-modal .nk-field-icon svg {
+    fill: none;
+    height: 26px;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.9;
+    width: 26px;
+}
+
+.receipt-modal .nk-field-card--so-phieu .nk-field-icon,
+.receipt-modal .nk-field-card--note .nk-field-icon {
+    background: #e9f8f4;
+    color: #0f8b84;
+}
+
+.receipt-modal .nk-field-card--kho .nk-field-icon {
+    background: #e8f2ff;
+    color: #2b7fd1;
+}
+
+.receipt-modal .nk-field-card--ncc .nk-field-icon {
+    background: #f0ecff;
+    color: #6450c7;
+}
+
+.receipt-modal .nk-field-card--ngay .nk-field-icon {
+    background: #fff3e8;
+    color: #f58b16;
+}
+
+.receipt-modal .nk-field-content {
+    min-width: 0;
+}
+
+.receipt-modal .nk-date-input-wrap {
+    position: relative;
+    overflow: visible;
+}
+
+.receipt-modal .nk-date-input {
+    padding-right: 40px;
+}
+
+.receipt-modal .nk-date-input-icon {
+    align-items: center;
+    background: transparent;
+    border: none;
+    color: #344966;
+    display: inline-flex;
+    height: 24px;
+    justify-content: center;
+    overflow: hidden;
+    padding: 0;
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 24px;
+}
+
+.receipt-modal .nk-date-input-button {
+    cursor: pointer;
+}
+
+.receipt-modal .nk-date-input-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.receipt-modal .nk-date-input-icon svg {
+    fill: none;
+    height: 20px;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 2;
+    width: 20px;
+}
+
+.receipt-modal .nk-calendar-popover {
+    background: #fff;
+    border: 1px solid #d2dcea;
+    border-radius: 14px;
+    box-shadow: 0 10px 22px rgba(15, 33, 61, 0.16);
+    margin-top: 6px;
+    min-width: 360px;
+    padding: 10px 10px 0;
+    position: absolute;
+    right: 0;
+    top: calc(100% + 6px);
+    z-index: 420;
+}
+
+.receipt-modal .nk-calendar-header {
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+
+.receipt-modal .nk-calendar-title {
+    color: #1f2f46;
+    font-size: 16px;
+    font-weight: 800;
+}
+
+.receipt-modal .nk-calendar-nav {
+    align-items: center;
+    display: inline-flex;
+    gap: 2px;
+}
+
+.receipt-modal .nk-calendar-nav-btn {
+    align-items: center;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    color: #2e3d54;
+    cursor: pointer;
+    display: inline-flex;
+    font-size: 22px;
+    font-weight: 700;
+    height: 26px;
+    justify-content: center;
+    width: 26px;
+}
+
+.receipt-modal .nk-calendar-nav-btn:hover {
+    background: #f0f5fc;
+}
+
+.receipt-modal .nk-calendar-grid {
+    display: grid;
+    gap: 4px;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    padding: 2px 0 6px;
+}
+
+.receipt-modal .nk-calendar-weekday {
+    color: #66788f;
+    font-size: 12px;
+    font-weight: 800;
+    padding: 4px 0;
+    text-align: center;
+}
+
+.receipt-modal .nk-calendar-day {
+    background: transparent;
+    border: none;
+    border-radius: 999px;
+    color: #1e2b3f;
+    cursor: pointer;
+    font-size: 15px;
+    font-weight: 500;
+    height: 32px;
+    margin: 0 auto;
+    width: 32px;
+}
+
+.receipt-modal .nk-calendar-day:hover {
+    background: #eef4ff;
+}
+
+.receipt-modal .nk-calendar-day--outside {
+    color: #b1bfce;
+}
+
+.receipt-modal .nk-calendar-day--today {
+    color: #1460d6;
+    font-weight: 700;
+}
+
+.receipt-modal .nk-calendar-day--selected {
+    background: #1569eb;
+    color: #fff;
+    font-weight: 800;
+}
+
+.receipt-modal .nk-calendar-footer {
+    align-items: center;
+    border-top: 1px solid #dce5f0;
+    display: flex;
+    gap: 4px;
+    justify-content: space-between;
+    margin: 6px -10px 0;
+    padding: 8px 10px 10px;
+}
+
+.receipt-modal .nk-calendar-action {
+    background: transparent;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 800;
+    height: 34px;
+    padding: 0 10px;
+}
+
+.receipt-modal .nk-calendar-action--clear {
+    color: #e14553;
+}
+
+.receipt-modal .nk-calendar-action--today {
+    color: #1569eb;
+}
+
+.receipt-modal .nk-calendar-action--confirm {
+    background: #1569eb;
+    color: #fff;
+    min-width: 120px;
+}
+
+.receipt-modal .nk-calendar-action--confirm:hover {
+    background: #0f57c6;
+}
+
+.receipt-modal .detail-card {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    overflow: visible;
+    padding: 0;
+}
+
+.receipt-modal .detail-head {
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.receipt-modal .receipt-right-header {
+    margin-bottom: 14px;
+}
+
+.receipt-modal .detail-title {
+    color: #1c2f4a;
+    font-size: 15px;
+    font-weight: 800;
+}
+
+.receipt-modal .detail-tools {
+    align-items: center;
+    display: flex;
+    gap: 10px;
+}
+
+.receipt-modal .receipt-right-tools {
+    align-items: center;
+    display: flex;
+    gap: 10px;
+}
+
+.receipt-modal .money-wrap {
+    align-items: center;
+    display: flex;
+    gap: 8px;
+}
+
+.receipt-modal .money-label {
+    color: #51657f;
+    font-size: 13px;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.receipt-modal .money-select {
+    border-radius: 10px;
+    font-weight: 700;
+    height: 38px;
+    min-height: 38px;
+    min-width: 140px;
+    padding: 0 14px;
+    width: 140px;
+}
+
+.receipt-modal .btn-add-row,
+.receipt-modal .btn-save,
+.receipt-modal .btn-cancel {
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 800;
+    height: 38px;
+    min-height: 38px;
+    padding: 0 18px;
+}
+
+.receipt-modal .btn-add-row {
+    background: #ffffff;
+    border: 1px solid #cfdceb;
+    color: #1d3552;
+}
+
+.receipt-modal .nk-add-line-button {
+    align-items: center;
+    display: inline-flex;
+    gap: 8px;
+}
+
+.receipt-modal .nk-add-line-button svg {
+    fill: none;
+    height: 16px;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 2.2;
+    width: 16px;
+}
+
+.receipt-modal .btn-save {
+    align-items: center;
+    background: #0f5fbd;
+    border: 1px solid #0f5fbd;
+    color: #ffffff;
+    display: inline-flex;
+    gap: 8px;
+    justify-content: center;
+}
+
+.receipt-modal .nk-save-button svg {
+    fill: none;
+    height: 17px;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 2;
+    width: 17px;
+}
+
+.receipt-modal .btn-save:hover:not(:disabled) {
+    background: #0b4f9e;
+    border-color: #0b4f9e;
+}
+
+.receipt-modal .btn-cancel {
+    background: #ffffff;
+    border: 1px solid #cfdceb;
+    color: #1d3552;
+}
+
+.receipt-modal .btn-cancel:hover:not(:disabled) {
+    background: #f8fbff;
+}
+
+.receipt-modal .detail-table-wrap {
+    border-radius: 14px;
+    flex: 1;
+    min-height: 420px;
+    overflow-x: auto;
+    overflow-y: visible;
+    position: relative;
+}
+
+.receipt-modal .detail-table {
+    border-collapse: separate;
+    border-spacing: 0;
+    min-width: 760px;
+    overflow: visible;
+    table-layout: fixed;
+    width: 100%;
+}
+
+.receipt-modal .detail-table thead th {
+    background: #f1f5fa;
+    border-bottom: 1px solid #e5edf6;
+    color: #546983;
+    font-size: 12px;
+    font-weight: 800;
+    padding: 10px 8px;
+    text-align: left;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.receipt-modal .detail-table thead th:first-child {
+    border-top-left-radius: 12px;
+}
+
+.receipt-modal .detail-table thead th:last-child {
+    border-top-right-radius: 12px;
+}
+
+.receipt-modal .detail-table tbody td {
+    background: #ffffff;
+    border-bottom: 1px solid #eef3f8;
+    overflow: visible;
+    padding: 8px;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+
+.receipt-modal .detail-table .col-stt {
+    width: 38px;
+}
+
+.receipt-modal .detail-table .col-product {
+    width: 190px;
+}
+
+.receipt-modal .detail-table .col-unit {
+    width: 56px;
+}
+
+.receipt-modal .detail-table .col-qty {
+    width: 62px;
+}
+
+.receipt-modal .detail-table th.col-unit,
+.receipt-modal .detail-table th.col-qty {
+    font-size: 11px;
+    line-height: 1.15;
+    white-space: normal;
+}
+
+.receipt-modal .detail-table .col-price {
+    width: 108px;
+}
+
+.receipt-modal .detail-table .col-total {
+    color: #1c2f4a;
+    font-weight: 700;
+    width: 80px;
+}
+
+.receipt-modal .detail-table .col-action {
+    width: 64px;
+}
+
+.receipt-modal .combo-box {
+    position: relative;
+    width: 100%;
+    z-index: 1;
+}
+
+.receipt-modal .combo-box:focus-within {
+    z-index: 120;
+}
+
+.receipt-modal .combo-ui {
+    font-size: 16px;
+    height: var(--receipt-row-control-height);
+    min-height: var(--receipt-row-control-height);
+    padding-right: 30px;
+}
+
+.receipt-modal .combo-arrow {
+    color: #405977;
+    font-size: 11px;
+    pointer-events: none;
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.receipt-modal .combo-dropdown {
+    background: #ffffff;
+    border: 1px solid #d8e4f1;
+    border-radius: 12px;
+    box-shadow: 0 14px 30px rgba(19, 45, 78, 0.14);
+    left: 0;
+    max-height: 260px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    position: absolute;
+    right: 0;
+    top: calc(100% + 6px);
+    z-index: 240;
+}
+
+.receipt-modal .combo-option {
+    align-items: center;
+    background: #ffffff;
+    border-bottom: 1px solid #eef3f8;
+    cursor: pointer;
+    display: flex;
+    gap: 10px;
+    padding: 10px 12px;
+}
+
+.receipt-modal .combo-option:last-child {
+    border-bottom: none;
+}
+
+.receipt-modal .combo-option:hover,
+.receipt-modal .combo-option.active {
+    background: #f1f7ff;
+}
+
+.receipt-modal .combo-option--empty {
+    cursor: default;
+}
+
+.receipt-modal .combo-code {
+    color: #70839b;
+    font-size: 13px;
+    font-weight: 800;
+    min-width: 52px;
+}
+
+.receipt-modal .combo-name {
+    color: #1f3552;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.receipt-modal .unit-readonly {
+    align-items: center;
+    background: #f7fbff;
+    border: 1.5px solid #d7e2ef;
+    border-radius: var(--receipt-row-control-radius);
+    color: #6f839b;
+    display: inline-flex;
+    font-size: 16px;
+    font-weight: 700;
+    height: var(--receipt-row-control-height);
+    min-height: var(--receipt-row-control-height);
+    overflow: hidden;
+    padding: 0 8px;
+    text-overflow: ellipsis;
+    width: 100%;
+}
+
+.receipt-modal .qty-box {
+    align-items: stretch;
+    background: #ffffff;
+    border: 1.5px solid #cfdceb;
+    border-radius: var(--receipt-row-control-radius);
+    display: inline-flex;
+    height: var(--receipt-row-control-height);
+    min-height: var(--receipt-row-control-height);
+    overflow: hidden;
+}
+
+.receipt-modal .qty-btn {
+    align-items: center;
+    background: #f8fbff;
+    border: none;
+    color: #37506e;
+    display: inline-flex;
+    font-size: 14px;
+    font-weight: 700;
+    height: 100%;
+    justify-content: center;
+    line-height: 1;
+    width: 18px;
+}
+
+.receipt-modal .qty-btn:hover {
+    background: #eff6ff;
+}
+
+.receipt-modal .qty-input {
+    border: none;
+    border-left: 1px solid #e2ebf5;
+    border-right: 1px solid #e2ebf5;
+    color: #1b3551;
+    font-weight: 800;
+    height: 100%;
+    outline: none;
+    text-align: center;
+    font-size: 12px;
+    width: 20px;
+}
+
+.receipt-modal .price-input {
+    border-radius: var(--receipt-row-control-radius);
+    font-size: var(--receipt-row-control-font-size);
+    height: var(--receipt-row-control-height);
+    min-height: var(--receipt-row-control-height);
+    text-align: right;
+}
+
+.receipt-modal .btn-delete-row {
+    align-items: center;
+    background: #fff5f6;
+    border: 1px solid #f3c4ca;
+    border-radius: var(--receipt-row-control-radius);
+    color: #e25163;
+    display: inline-flex;
+    font-size: var(--receipt-row-control-font-size);
+    font-weight: 800;
+    height: var(--receipt-row-control-height);
+    justify-content: center;
+    min-width: var(--receipt-row-control-height);
+    padding: 0;
+    width: var(--receipt-row-control-height);
+}
+
+.receipt-modal .btn-delete-row svg {
+    fill: none;
+    height: 14px;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 2;
+    width: 14px;
+}
+
+.receipt-modal .btn-delete-row:hover:not(:disabled) {
+    background: #ffecee;
+}
+
+.receipt-modal .total-row {
+    align-items: center;
+    background: #f8fbff;
+    border: 1px solid #e7eef7;
+    border-radius: 14px;
+    display: flex;
+    justify-content: space-between;
+    margin-top: auto;
+    padding: 16px;
+}
+
+.receipt-modal .total-label {
+    color: #1c2f4a;
+    font-size: 14px;
+    font-weight: 800;
+}
+
+.receipt-modal .total-value {
+    color: #1c2f4a;
+    font-size: 14px;
+    font-weight: 900;
+}
+
+.receipt-modal .receipt-footer {
+    align-items: center;
+    background: #ffffff;
+    border-top: 1px solid #e7eef7;
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+    padding: 10px 0 2px;
+}
+
+.receipt-modal .receipt-footer--left {
+    background: transparent;
+    border-top: none;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-top: auto;
+    padding-top: 8px;
+}
+
+.receipt-modal .receipt-footer--left .btn-save {
+    min-width: 182px;
+}
+
+.receipt-modal .receipt-footer-inline {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-top: 8px;
+}
+
+.receipt-modal .receipt-left .full-width {
+    grid-column: 1 / -1;
+}
+
+@media (max-width: 1100px) {
+    .receipt-modal.modal-card--nhap-form {
+        max-width: calc(100vw - 10px);
+        width: calc(100vw - 10px);
+    }
+
+    .receipt-modal .receipt-workspace {
+        grid-template-columns: 1fr;
+    }
+
+    .receipt-modal .receipt-info-panel,
+    .receipt-modal .receipt-detail-panel {
+        min-height: 0;
+    }
+
+    .receipt-modal .receipt-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .receipt-modal .detail-head {
+        align-items: stretch;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .receipt-modal .detail-tools {
+        flex-wrap: wrap;
+        justify-content: space-between;
+    }
+}
+

@@ -1,5 +1,7 @@
 @page "/phan-quyen/kho-user"
 @rendermode InteractiveServer
+@using System.Text
+@using System.Text.Encodings.Web
 @using BlazorApp1.Infrastructure.Excel
 @using BlazorApp1.Models.Kho
 @using BlazorApp1.Models.KhoUser
@@ -175,15 +177,49 @@
                                 <div class="form-field__head">
                                     <label class="form-field__label">Kho <span class="required-mark">*</span></label>
                                 </div>
-                                <InputSelect class="form-field__input"
-                                             @bind-Value="formModel.Kho_ID">
-                                    <option value="0">-- Chọn kho --</option>
-                                    @foreach (var option in khoOptions)
+                                <div class="combo-box">
+                                    <div class="combo-box__control">
+                                        <input class="form-field__input form-field__input--combo"
+                                               value="@khoKeyword"
+                                               @oninput="HandleKhoInput"
+                                               @onfocus="OpenKhoDropdown"
+                                               @onblur="HandleKhoBlurAsync"
+                                               placeholder="Chọn hoặc nhập chữ để lọc kho"
+                                               autocomplete="off" />
+                                        <button type="button"
+                                                class="combo-box__toggle"
+                                                @onclick="ToggleKhoDropdown"
+                                                tabindex="-1"
+                                                aria-label="Mở danh sách kho">
+                                            <span class="combo-box__caret @(isKhoDropdownOpen ? "combo-box__caret--open" : string.Empty)">⌄</span>
+                                        </button>
+                                    </div>
+                                    @if (isKhoDropdownOpen)
                                     {
-                                        <option value="@option.Kho_ID">@option.Ten_Kho</option>
+                                        <div class="combo-box__menu">
+                                            @if (FilteredKhoOptions.Count == 0)
+                                            {
+                                                <div class="combo-box__empty">Không có kho phù hợp.</div>
+                                            }
+                                            else
+                                            {
+                                                @foreach (var option in FilteredKhoOptions)
+                                                {
+                                                    <button type="button"
+                                                            class="combo-box__option @(option.Kho_ID == formModel.Kho_ID ? "combo-box__option--active" : string.Empty)"
+                                                            @onclick="() => SelectKho(option)">
+                                                        @((MarkupString)BuildHighlightedOptionHtml(FormatKhoOption(option), khoKeyword))
+                                                    </button>
+                                                }
+                                            }
+                                        </div>
                                     }
-                                </InputSelect>
+                                </div>
                                 <p class="form-field__hint">Bộ mã đăng nhập và kho phải duy nhất.</p>
+                                @if (!string.IsNullOrWhiteSpace(khoLookupMessage))
+                                {
+                                    <p class="form-field__lookup-warning">@khoLookupMessage</p>
+                                }
                                 <ValidationMessage For="@(() => formModel.Kho_ID)" />
                             </div>
 
@@ -222,8 +258,12 @@
     private string? formMessage;
     private bool formMessageIsError;
     private string searchKeyword = string.Empty;
+    private string khoKeyword = string.Empty;
+    private string? khoLookupMessage;
+    private bool isKhoDropdownOpen;
     private FormMode currentFormMode = FormMode.None;
     private static readonly IReadOnlyList<string> ImportPreviewHeaders = ["Mã đăng nhập", "Kho"];
+    private static readonly HtmlEncoder HtmlEncoder = HtmlEncoder.Default;
 
     private bool IsFormVisible => currentFormMode != FormMode.None;
     private bool IsEditing => currentFormMode == FormMode.Edit;
@@ -245,6 +285,24 @@
                 .Where(x =>
                     ContainsKeyword(x.Ma_Dang_Nhap, keyword)
                     || ContainsKeyword(x.Ten_Kho, keyword))
+                .ToList();
+        }
+    }
+
+    private IReadOnlyList<KhoListItemVm> FilteredKhoOptions
+    {
+        get
+        {
+            var keyword = khoKeyword.Trim();
+            if (string.IsNullOrWhiteSpace(keyword))
+            {
+                return khoOptions;
+            }
+
+            return khoOptions
+                .Where(x =>
+                    ContainsKeyword(x.Ten_Kho, keyword)
+                    || ContainsKeyword(FormatKhoOption(x), keyword))
                 .ToList();
         }
     }
@@ -272,6 +330,11 @@
 
             khoOptions.Clear();
             khoOptions.AddRange(getKhoTask.Result);
+
+            if (IsFormVisible)
+            {
+                SyncKhoKeywordFromFormModel();
+            }
 
             if (!HasKhoOptions)
             {
@@ -326,6 +389,7 @@
             Ma_Dang_Nhap = result.Data.Ma_Dang_Nhap,
             Kho_ID = result.Data.Kho_ID
         };
+        SyncKhoKeywordFromFormModel();
         currentFormMode = FormMode.Edit;
     }
 
@@ -334,6 +398,14 @@
         if (!HasKhoOptions)
         {
             formMessage = "Cần có dữ liệu kho trước khi lưu.";
+            formMessageIsError = true;
+            return;
+        }
+
+        TryApplyKhoKeywordSelection(showValidationMessage: true);
+        if (formModel.Kho_ID <= 0)
+        {
+            formMessage = "Vui lòng chọn kho hợp lệ.";
             formMessageIsError = true;
             return;
         }
@@ -415,6 +487,9 @@
     private void ResetFormModel()
     {
         formModel = new KhoUserUpsertVm();
+        khoKeyword = string.Empty;
+        khoLookupMessage = null;
+        isKhoDropdownOpen = false;
     }
 
     private void ClearSearch()
@@ -430,6 +505,39 @@
     private void HandleMaDangNhapInput(ChangeEventArgs args)
     {
         formModel.Ma_Dang_Nhap = args.Value?.ToString() ?? string.Empty;
+    }
+
+    private void HandleKhoInput(ChangeEventArgs args)
+    {
+        khoKeyword = args.Value?.ToString() ?? string.Empty;
+        khoLookupMessage = null;
+        TryApplyKhoKeywordSelection(showValidationMessage: false);
+        isKhoDropdownOpen = true;
+    }
+
+    private void OpenKhoDropdown(FocusEventArgs _)
+    {
+        isKhoDropdownOpen = true;
+    }
+
+    private async Task HandleKhoBlurAsync(FocusEventArgs _)
+    {
+        await Task.Delay(120);
+        isKhoDropdownOpen = false;
+        TryApplyKhoKeywordSelection(showValidationMessage: true);
+    }
+
+    private void ToggleKhoDropdown()
+    {
+        isKhoDropdownOpen = !isKhoDropdownOpen;
+    }
+
+    private void SelectKho(KhoListItemVm option)
+    {
+        formModel.Kho_ID = option.Kho_ID;
+        khoKeyword = FormatKhoOption(option);
+        khoLookupMessage = null;
+        isKhoDropdownOpen = false;
     }
 
     private async Task ExportTemplateAsync()
@@ -672,6 +780,88 @@
     {
         return !string.IsNullOrWhiteSpace(source)
                && source.Contains(keyword, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void TryApplyKhoKeywordSelection(bool showValidationMessage)
+    {
+        var keyword = khoKeyword.Trim();
+        if (string.IsNullOrWhiteSpace(keyword))
+        {
+            formModel.Kho_ID = 0;
+            if (showValidationMessage)
+            {
+                khoLookupMessage = "Vui lòng chọn kho.";
+            }
+
+            return;
+        }
+
+        var matched = khoOptions.FirstOrDefault(x =>
+            string.Equals(x.Ten_Kho, keyword, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(FormatKhoOption(x), keyword, StringComparison.OrdinalIgnoreCase));
+
+        if (matched is null)
+        {
+            formModel.Kho_ID = 0;
+            if (showValidationMessage)
+            {
+                khoLookupMessage = $"Không tìm thấy kho '{keyword}'.";
+            }
+
+            return;
+        }
+
+        formModel.Kho_ID = matched.Kho_ID;
+        khoKeyword = FormatKhoOption(matched);
+        khoLookupMessage = null;
+    }
+
+    private void SyncKhoKeywordFromFormModel()
+    {
+        var kho = khoOptions.FirstOrDefault(x => x.Kho_ID == formModel.Kho_ID);
+        khoKeyword = kho is null ? string.Empty : FormatKhoOption(kho);
+        khoLookupMessage = null;
+    }
+
+    private static string FormatKhoOption(KhoListItemVm option)
+    {
+        return option.Ten_Kho;
+    }
+
+    private static string BuildHighlightedOptionHtml(string optionText, string keyword)
+    {
+        var safeText = optionText ?? string.Empty;
+        var trimmedKeyword = keyword?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(trimmedKeyword))
+        {
+            return HtmlEncoder.Encode(safeText);
+        }
+
+        var result = new StringBuilder();
+        var startIndex = 0;
+
+        while (startIndex < safeText.Length)
+        {
+            var matchIndex = safeText.IndexOf(trimmedKeyword, startIndex, StringComparison.OrdinalIgnoreCase);
+            if (matchIndex < 0)
+            {
+                result.Append(HtmlEncoder.Encode(safeText[startIndex..]));
+                break;
+            }
+
+            if (matchIndex > startIndex)
+            {
+                result.Append(HtmlEncoder.Encode(safeText[startIndex..matchIndex]));
+            }
+
+            var matchedText = safeText.Substring(matchIndex, trimmedKeyword.Length);
+            result.Append("<span class=\"combo-box__option-match\">");
+            result.Append(HtmlEncoder.Encode(matchedText));
+            result.Append("</span>");
+            startIndex = matchIndex + trimmedKeyword.Length;
+        }
+
+        return result.ToString();
     }
 
     private async Task DownloadExcelAsync(string fileName, byte[] bytes)

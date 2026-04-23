@@ -43,6 +43,11 @@ public sealed class Program
         builder.Services.AddScoped<INhapKhoService, NhapKhoService>();
         builder.Services.AddScoped<IXuatKhoService, XuatKhoService>();
         builder.Services.AddScoped<IBaoCaoService, BaoCaoService>();
+        builder.Services.AddHttpClient<ICurrencyExchangeRateService, CurrencyExchangeRateService>(client =>
+        {
+            client.BaseAddress = new Uri("https://open.er-api.com/");
+            client.Timeout = TimeSpan.FromSeconds(8);
+        });
 
         var app = builder.Build();
 
